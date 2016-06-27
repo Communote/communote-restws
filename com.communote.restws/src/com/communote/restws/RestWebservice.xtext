@@ -90,9 +90,16 @@ Resource:
     'resource' name=ID "{"
     //Documentation text
     doc=Documentation
+    
     //doc of methods
     (docMethod+=DocumentationMethod)*
+    
+    //you can specify contenttypes but you don't need to default is application/json
+    ("contenttypes" "{" contenttypes+=ContentTypes ("," contenttypes+=ContentTypes)* "}")?
+
+    // set property to define resource as an specific type
     (property=Property)?
+    
     //you can specify parameters but you don't need to 
     ("parameters" "{" (parameters+=Parameter)* "}")?
     // you need to specify at least one attribute 
@@ -132,4 +139,11 @@ enum Types:
     BYTE="byte" |
     DATE="date" |
     BOOLEAN="boolean";
-    
+
+/*Represents all the mime types*/
+enum ContentTypes:
+    APPLICATION_FORM_URLENCODED = "application/x-www-form-urlencoded" |
+    APPLICATION_JSON = "application/json" |
+    APPLICATION_OCTET_STREAM = "application/octet-stream" |
+    MULTIPART_FORM_DATA ="multipart/form-data";
+

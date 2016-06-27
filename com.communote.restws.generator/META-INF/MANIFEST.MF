@@ -2,10 +2,10 @@ Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
 Bundle-Name: com.communote.restws.generator
 Bundle-SymbolicName: com.communote.restws.generator;singleton:=true
-Bundle-Version: 1.0.26
+Bundle-Version: 1.0.27
 Bundle-ClassPath: com.communote.restws.generator
 Bundle-Vendor: Communote GmbH
-Require-Bundle: com.communote.restws;bundle-version="1.0.15";visibility:=reexport,
+Require-Bundle: com.communote.restws;bundle-version="1.0.16";visibility:=reexport,
  org.eclipse.xpand;bundle-version="2.0.0";visibility:=reexport,
  org.eclipse.xtend;bundle-version="2.0.0";visibility:=reexport,
  org.eclipse.xtend.typesystem.emf;bundle-version="2.0.0";visibility:=reexport,

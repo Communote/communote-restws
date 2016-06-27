@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.communote.restws</groupId>
     <artifactId>dsl</artifactId>
-    <version>1.0.15</version>
+    <version>1.0.16</version>
     <name>Rest web-service domain specific language</name>
     <organization>
         <name>Communote GmbH</name>

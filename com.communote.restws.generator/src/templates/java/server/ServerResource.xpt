@@ -24,6 +24,7 @@ import javax.ws.rs.HeaderParam;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.core.Context;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Request;
 import javax.ws.rs.core.Response;
@@ -124,7 +125,7 @@ public class «this.name»Resource extends AbstractResource{
 	
 	/**
 	*	Because of missing implementation in JAX-RS the id of the session is put into a separate header field and accessible through this variable 	
-	**/
+	*/
 	@HeaderParam("requestSessionId") String requestSessionId;
 	
 	
@@ -138,7 +139,7 @@ public class «this.name»Resource extends AbstractResource{
 	*	This method handles the GET requests coming to the web service. 
 	*   @params «this.resourceId.first().name» - «((AbstractParameterAttribute)this.resourceId.first()).content.doc.description»
 	*	@return Response - The status code and the http message that is send back to the client
-	**/
+	*/
 	public Response «this.name.toFirstLower()-»Single(«EXPAND getPathParams(currentVersion, filePath) FOR this.resourceId-») throws Exception  {
 		return getResourceHandler().handleGet(new Get«this.name»Parameter(uriInfo.getQueryParameters(true),«EXPAND getPathParamsAsMethodParams FOR this.resourceId-»), requestedMimeType, uriInfo, requestSessionId, request);
 	}
@@ -152,7 +153,7 @@ public class «this.name»Resource extends AbstractResource{
 	*	This method handles the DELETE requests coming to the web service. 
 	*   @params «this.resourceId.first().name» - «((AbstractParameterAttribute)this.resourceId.first()).content.doc.description»
 	*	@return Response - The status code and the http message that is send back to the client
-	**/
+	*/
 	public Response delete«this.name»(MultivaluedMap<String, String> params, «EXPAND getPathParams(currentVersion, filePath) FOR this.resourceId-») throws Exception {
 		return getResourceHandler().handleDelete(new Delete«this.name»Parameter(params, «EXPAND getPathParamsAsMethodParams FOR this.resourceId-»), requestedMimeType, uriInfo, requestSessionId, request);
 	}
@@ -167,7 +168,7 @@ public class «this.name»Resource extends AbstractResource{
 	*	@parmas params - map that contains all parameter sent with the web service request
 	*   @params «this.resourceId.first().name» - «((AbstractParameterAttribute)this.resourceId.first()).content.doc.description»
 	*	@return Response - The status code and the http message that is send back to the client
-	**/
+	*/
 	public Response edit«this.name»(MultivaluedMap<String, String> params, «EXPAND getPathParams(currentVersion, filePath) FOR this.resourceId-») throws Exception {
 		return getResourceHandler().handleEdit(new Edit«this.name»Parameter(params, «EXPAND getPathParamsAsMethodParams FOR this.resourceId-»), requestedMimeType, uriInfo, requestSessionId, request);
 	}
@@ -175,13 +176,13 @@ public class «this.name»Resource extends AbstractResource{
 	
 	@javax.ws.rs.PUT
 	@Path("{«this.resourceId.first().name»}")
-	@javax.ws.rs.Consumes("application/json")
+	@javax.ws.rs.Consumes( MediaType.APPLICATION_JSON )
 	/**
 	*	This method handles the PUT requests coming to the web service. 
 	*	@parmas params - map that contains all parameter sent with the web service request
 	*   @params «this.resourceId.first().name» - «((AbstractParameterAttribute)this.resourceId.first()).content.doc.description»
 	*	@return Response - The status code and the http message that is send back to the client
-	**/
+	*/
 	public Response edit«this.name»(String jsonRepresentation, «EXPAND getPathParams(currentVersion, filePath) FOR this.resourceId-») throws Exception {
 		return getResourceHandler().handleEdit(new Edit«this.name»Parameter(jsonRepresentation, «EXPAND getPathParamsAsMethodParams FOR this.resourceId-»), requestedMimeType, uriInfo, requestSessionId, request);
 	}
@@ -195,7 +196,7 @@ public class «this.name»Resource extends AbstractResource{
 	*	This method handles the LIST requests coming to the web service. 
 	*   @params «EXPAND getPathParams(currentVersion, filePath) FOR this.resourceId.withoutFirst()»
 	*	@return Response - The status code and the http message that is send back to the client
-	**/
+	*/
 	public Response «this.name.toFirstLower()»List(«EXPAND getPathParams(currentVersion, filePath) FOR this.resourceId.withoutFirst()-») throws Exception {
 		if(uriInfo == null){return null;} //is needed otherwise the jackson parser will throw a NullPointerException
 		return getResourceHandler().handleList(new GetCollection«this.name»Parameter(uriInfo.getQueryParameters(true)
@@ -205,6 +206,7 @@ public class «this.name»Resource extends AbstractResource{
 	
 	«REM»If the resource id has the http method POST this method for a requesting a single resource will be generated«ENDREM»
 	«IF isCreationAvailable(currentVersion, this, (Method)Method.getStaticProperty("POST").get())»
+	
 	@javax.ws.rs.POST
 	/**
 	*	This method handles the POST requests coming to the web service. 
@@ -217,30 +219,31 @@ public class «this.name»Resource extends AbstractResource{
 		«IF this.resourceId.withoutFirst().size > 0»,«EXPAND getPathParamsAsMethodParams FOR this.resourceId.withoutFirst()-»«ENDIF»), requestedMimeType, uriInfo, requestSessionId, request);
 	}
 	
-	
 	@javax.ws.rs.POST
-	@javax.ws.rs.Consumes("application/json")
+    @javax.ws.rs.Consumes( MediaType.APPLICATION_JSON )
 	/**
 	*	This method handles the POST requests coming to the web service. 
 	*	@parmas params - map that contains all parameter sent with the web sermvn vice request
 	*   @params «EXPAND getPathParams(currentVersion, filePath) FOR this.resourceId.withoutFirst()»
 	*	@return Response - The status code and the http message that is send back to the client
-	**/
+	*/
 	public Response create«this.name»(String jsonRepresentation«IF this.resourceId.withoutFirst().size > 0»,«EXPAND getPathParams(currentVersion, filePath) FOR this.resourceId.withoutFirst()-»«ENDIF») throws Exception {
 		return getResourceHandler().handleCreate(new Create«this.name»Parameter(jsonRepresentation«IF this.resourceId.withoutFirst().size > 0»,«EXPAND getPathParamsAsMethodParams FOR this.resourceId.withoutFirst()-»«ENDIF»), requestedMimeType, uriInfo, requestSessionId, request);
 	}
 	
+	«IF this.contenttypes.exists(e|e.toString() == "multipart/form-data") && this.contenttypes.exists(e|e.toString() == "application/octet-stream") »
 	
 	@javax.ws.rs.POST
-	@javax.ws.rs.Consumes("multipart/form-data")
+	@javax.ws.rs.Consumes({ MediaType.MULTIPART_FORM_DATA, MediaType.APPLICATION_OCTET_STREAM })
 	/**
-     *    This method handles the POST requests, containing attachments, that coms to the web service. 
-     *    @parmas entity represents incoming request
-     *    @return Response The status code and the http message that is send back to the client
-     **/
+     *  This method handles the POST requests, containing attachments, that coms to the web service. 
+     *  @return Response The status code and the http message that is send back to the client
+     */
 	public Response create«this.name»() throws Exception {
 		return getResourceHandler().handleCreate(null, requestedMimeType, uriInfo, requestSessionId, request);
 	}
+	
+	«ENDIF»
 	
 	«ENDIF»
 	
