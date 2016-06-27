@@ -1,0 +1,348 @@
+«IMPORT restWebservice»
+
+«EXTENSION templates::java::client::ClientExtension»
+«EXTENSION templates::Extensions»
+
+«DEFINE skeleton(APIVersion version, List[MimeType] mimeTypes, Boolean fullRestSupport) FOR RestWebservice»
+	«FILE getAppPath(version) + "/" + this.name.toFirstUpper() + "Client.java"-»
+package «getAppPath((APIVersion)version).replaceAll("/",".")»;
+
+import java.io.InputStream;
+import java.util.List;
+
+import org.apache.commons.io.IOUtils;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.type.TypeReference;
+import org.restlet.data.ChallengeScheme;
+import org.restlet.data.Form;
+import org.restlet.ext.json.JsonRepresentation;
+import org.restlet.representation.Representation;
+import org.restlet.resource.ClientResource;
+
+import com.communote.plugins.api.rest.client.common.util.PageableList;
+import «getAppPath((APIVersion)version).replaceAll("/",".")».to.ApiResult;
+
+
+/**
+ * «this.name.toFirstUpper()»Client represents a Java client for the REST-API.
+ */
+public class «this.name»Client {
+    
+    /**
+     * Number of all found elements.
+     */
+    private static final String NUMBER_OF_ELEMENTS = "numberOfElements";
+
+    /**
+     * Indicator for more elements after maxCount.
+     */
+    private static final String MORE_ELEMENTS_AVAILABLE = "moreElementsAvailable";
+    
+    private final String baseUrl;
+    private final String password;
+    private final String user;
+    private ClientResource resource;
+    private final ObjectMapper mapper;
+    
+    /**
+     * Creates a client for the REST-API.
+     * 
+     * @param baseUrl
+     *            the root URL to the REST resources, for example:
+     *            "http://localhost:8080/microblog/global/api/rest/1.3"
+     * @param user
+     *            a user name to get access to the REST resources
+     * @param password
+     *            the appropriate password for the user name
+     */
+    public «this.name.toFirstUpper()»Client(String baseUrl, String user, String password) {
+        this.baseUrl = baseUrl;
+        this.user = user;
+        this.password = password;
+        mapper = new ObjectMapper();
+    }
+
+    /**
+     * Contains supported MIME types.
+     * 
+     * @author Communardo Software GmbH - <a
+     *         href="http://www.communardo.de/">http://www.communardo.de/</a>
+     */
+    public enum EMime {
+    	«FOREACH mimeTypes AS mimeType SEPARATOR ","»
+    	/**
+         * «mimeType.ext.first().toUpperCase()»
+         */
+        «mimeType.ext.first().toUpperCase()»("«mimeType.mime»")
+    	«ENDFOREACH»;
+        
+        private String mimeType;
+
+        /**
+         * Sets MIME type.
+         * @param m MIME type
+         */
+        private EMime(String m) {
+          mimeType = m;
+        }
+       
+        /**
+         * Returns the MIME type.
+         * @return MIME type
+         */
+        public String getCode() {
+          return mimeType;
+        }
+    }
+    
+    /**
+     * Authentication the client to server.
+     * 
+     * @param resourceURL
+     *            URL to the server resource
+     * @return the client resource to request server resources
+     */
+    private ClientResource authenticate(String resourceURL) {
+        // provide different authentication types
+		if (resource == null) {
+            resource = new ClientResource(resourceURL);
+            resource.setChallengeResponse(ChallengeScheme.HTTP_BASIC, user, password);
+        }
+        resource.setReference(resourceURL);
+        return resource;
+    }
+   	
+   	«EXPAND parametertemplate(version, fullRestSupport, this.name, "") FOREACH resources»
+}
+	«ENDFILE»
+
+	«REM»Generates an Exception thrown by the Java Client«ENDREM»
+	«FILE getAppPath(version) + "/" + this.name.toFirstUpper() + "ClientException.java"-»
+package «getAppPath((APIVersion)version).replaceAll("/",".")»;
+
+/**
+ * Exception to be thrown when there are problems with requests of the {@link «this.name.toFirstUpper()»Client}.
+ */
+public class «this.name.toFirstUpper()»ClientException extends Exception {
+
+    private static final long serialVersionUID = 1865854343334477203L;
+
+    /**
+     * Constructs a new exception with the specified detail message.
+     * 
+     * @param message
+     *            the detail message
+     */
+    public «this.name.toFirstUpper()»ClientException(String message) {
+        super(message);
+    }
+
+    /**
+     * Constructs a new exception with the specified detail message and the caused exception.
+     * 
+     * @param message
+     *            the detail message
+     * @param e
+     *            the caused exception
+     */
+    public «this.name.toFirstUpper()»ClientException(String message, Exception e) {
+        super(message, e);
+    }
+}
+	«ENDFILE»
+	
+	«FILE getAppPath(version) + "/Util.java"-»
+package «getAppPath((APIVersion)version).replaceAll("/",".")»;
+
+import java.lang.String;
+import java.util.List;
+
+public class Util {
+	public static <O> String toParamList(O[] array, String key) {
+		String ret = "";
+		for (O str : array) {
+			ret += key + "=" + str.toString() + "&";
+		}
+		return ret;
+	}
+    public static <T extends Enum<?> > String toParamList(List<T> list, String key) {
+        String ret = "";
+        for (T element : list) {
+            ret += key + "=" + element.name() + "&";
+        }
+        return ret;
+    }
+}
+	«ENDFILE»
+	
+	«FILE getAppPath(version) + "/MethodParameter.java"-»
+package «getAppPath((APIVersion)version).replaceAll("/",".")»;
+import org.apache.commons.codec.EncoderException;
+
+public abstract class MethodParameter {
+	public abstract java.lang.String getUriPath();
+	public abstract java.lang.String getParameterString() throws EncoderException;
+	public abstract java.lang.Boolean isValidParameterList();
+}
+	«ENDFILE»
+«ENDDEFINE»
+
+«DEFINE parametertemplate(APIVersion version, Boolean fullRestSupport, String webServiceName, String parentResourcePath) FOR Resource»
+	«REM»Generates all HTTP-methods for each resource.«ENDREM»	
+	«LET parentResourcePath + "/" + this.name.toFirstUpper() AS resourcePath»
+		«IF hasMethod(this.resourceId.first(), (Method)Method.getStaticProperty("GET").get())» 
+			«EXPAND resourceparameter(version, "Get", (Method)Method.getStaticProperty("GET").get(), fullRestSupport, webServiceName, resourcePath) FOR this»
+		«ENDIF»
+		«IF hasMethod(this.resourceId.first(), (Method)Method.getStaticProperty("PUT").get())» 
+			«EXPAND resourceparameter(version, "Edit", (Method)Method.getStaticProperty("PUT").get(), fullRestSupport, webServiceName, resourcePath) FOR this»
+		«ENDIF»
+		«IF isCreationAvailable(version, this, (Method)Method.getStaticProperty("POST").get())»
+			«EXPAND resourceparameter(version, "Create",	(Method)Method.getStaticProperty("POST").get(),	fullRestSupport, webServiceName, resourcePath) FOR this»
+		«ENDIF»
+		«IF hasMethod(this.resourceId.first(), (Method)Method.getStaticProperty("DELETE").get())» 
+			«EXPAND resourceparameter(version, "Delete", (Method)Method.getStaticProperty("DELETE").get(), fullRestSupport, webServiceName, resourcePath) FOR this»
+		«ENDIF»
+		«IF  isCreationAvailable(version, this, (Method)Method.getStaticProperty("GET_COLLECTION").get())»
+			«EXPAND resourceparameter(version, "GetCollection", (Method)Method.getStaticProperty("GET_COLLECTION").get(), fullRestSupport, webServiceName, resourcePath) FOR this»
+		«ENDIF»
+		
+		«REM»recursive call for subresources«ENDREM»
+		«EXPAND parametertemplate(version, fullRestSupport, webServiceName, resourcePath ) FOREACH this.subResources»
+	«ENDLET»
+«ENDDEFINE»
+
+«DEFINE resourceparameter(APIVersion version, String fileprefix, Method method, Boolean fullRestSupport, String webServiceName, String resourcePath) FOR Resource»
+    «REM»handle methods that return byte arrays separately«ENDREM»
+    «IF (this.name.toLowerCase().matches("attachment"))-»
+    	«EXPAND byteresource(version, fileprefix, method, fullRestSupport, webServiceName, resourcePath) FOR this»
+    «ENDIF»
+    «IF (this.name.toLowerCase().matches("image"))-»
+		«EXPAND byteresource(version, fileprefix, method, fullRestSupport, webServiceName, resourcePath) FOR this»
+	«ELSE»
+    /**
+     * Calls a «method.toString().toUpperCase()»-method for the REST resource {@link «getPackagePathForClient(version,resourcePath,this.name.toFirstUpper() + "Resource")»}.
+     * 
+     * @param «getPackagePathForClient(version,resourcePath,fileprefix.toFirstUpper() + this.name.toFirstUpper() + "Parameter")»
+     *            the parameter to «fileprefix.toFirstLower()» a REST resource.
+     «IF (method == ((Method)Method.getStaticProperty("GET_COLLECTION").get()) || method == ((Method)Method.getStaticProperty("GET").get()))-» «REM»handle GET and LIST method separately«ENDREM»
+     * @return the responded {@link «getPackagePathForClient(version,resourcePath,this.name.toFirstUpper() + "Resource")»}
+     * @throws «webServiceName.toFirstUpper()»ClientException
+     *             if mapping the response to {@link «getPackagePathForClient(version,resourcePath,this.name.toFirstUpper() + "Resource")»} fails
+     */
+    public 	«IF (method == ((Method)Method.getStaticProperty("GET_COLLECTION").get()))-»PageableList<«getPackagePathForClient(version,resourcePath,this.name.toFirstUpper() + "Resource")»>
+    		«ELSE-»«getPackagePathForClient(version,resourcePath,this.name.toFirstUpper() + "Resource")»«ENDIF-»
+    	 	«fileprefix.toFirstLower()»«resourcePath.replaceAll("/","")»(«getPackagePathForClient(version,resourcePath,fileprefix.toFirstUpper() + this.name.toFirstUpper() + "Parameter")» «fileprefix.toFirstLower()»«this.name»Parameter)
+    	 	throws «webServiceName.toFirstUpper()»ClientException {
+        try {
+	        resource = authenticate(baseUrl + «fileprefix.toFirstLower()»«this.name»Parameter.getUriPath() + «fileprefix.toFirstLower()»«this.name»Parameter.getParameterString());
+
+            // map response
+            ApiResult<«IF (method == ((Method)Method.getStaticProperty("GET_COLLECTION").get()))-»List<«getPackagePathForClient(version,resourcePath,this.name.toFirstUpper() + "Resource")»>«ELSE-»«getPackagePathForClient(version,resourcePath,this.name.toFirstUpper() + "Resource")»«ENDIF-»> readValue = mapper
+                    .readValue(resource.get().getStream(),
+                            new TypeReference<ApiResult<
+            «IF (method == ((Method)Method.getStaticProperty("GET_COLLECTION").get()))-»List<«getPackagePathForClient(version,resourcePath,this.name.toFirstUpper() + "Resource")»>«ELSE-»«getPackagePathForClient(version,resourcePath,this.name.toFirstUpper() + "Resource")»«ENDIF-»>>(){});
+            // check status
+            if (!readValue.getStatus().equals("OK")) {
+                throw new «webServiceName.toFirstUpper()»ClientException(
+                        "There was an error executing the HTTP request. Responded status: "
+                                + readValue.getStatus());
+            }
+            
+            «IF (method == ((Method)Method.getStaticProperty("GET_COLLECTION").get()))-»
+            PageableList<«getPackagePathForClient(version,resourcePath,this.name.toFirstUpper() + "Resource")»> pageableList;
+            if (readValue.getMetaData() != null) {
+                pageableList = new PageableList<«getPackagePathForClient(version,resourcePath,this.name.toFirstUpper() + "Resource")»>(
+                        readValue
+                                .getResult(), ((Integer) readValue.getMetaData().get(NUMBER_OF_ELEMENTS)).intValue(),
+                        ((Boolean) readValue.getMetaData().get(MORE_ELEMENTS_AVAILABLE)).booleanValue());
+            } else {
+                pageableList = new PageableList<«getPackagePathForClient(version,resourcePath,this.name.toFirstUpper() + "Resource")»>(
+                        readValue
+                                .getResult());
+            }
+            
+            return pageableList;
+            «ELSE-»
+            return readValue.getResult();
+            «ENDIF-» 
+
+        } catch (Exception e) {
+            throw new «webServiceName.toFirstUpper()»ClientException(e.getMessage(), e);
+        }
+    }
+    «ELSEIF (method == ((Method)Method.getStaticProperty("POST").get()) || method == ((Method)Method.getStaticProperty("PUT").get()))-» «REM»handle POST and PUT method separately«ENDREM»
+	 * @return the responded {@link «this.name.toFirstUpper()»Resource} identifier
+     * @throws «webServiceName.toFirstUpper()»ClientException
+     *             if mapping the response to {@link «getPackagePathForClient(version,resourcePath,this.name.toFirstUpper() + "Resource")»} fails
+     */
+    public Long
+    	 	«fileprefix.toFirstLower()»«this.name.toFirstUpper()»(«getPackagePathForClient(version,resourcePath,fileprefix.toFirstUpper() + this.name.toFirstUpper() + "Parameter")» «fileprefix.toFirstLower()»«this.name»Parameter)
+    	 	throws «webServiceName.toFirstUpper()»ClientException {
+        try {
+	        resource = authenticate(baseUrl + «fileprefix.toFirstLower()»«this.name»Parameter.getUriPath());
+	        «IF (method == ((Method)Method.getStaticProperty("PUT").get()) && fullRestSupport)-»
+	        Representation response = resource.put(new JsonRepresentation(«fileprefix.toFirstLower()»«this.name»Parameter.getResourceJSONRepresentation()));
+	        «ELSE-»
+			Representation response = resource.post(new JsonRepresentation(«fileprefix.toFirstLower()»«this.name»Parameter.getResourceJSONRepresentation()));
+	        «ENDIF-»
+            // map response
+            ApiResult<String> readValue = mapper.readValue(response.getStream(),
+                            new TypeReference<ApiResult<String>>() {
+                            });
+            // check status
+            if (!readValue.getStatus().equals("OK")) {
+                throw new «webServiceName.toFirstUpper()»ClientException(
+                        "There was an error executing the HTTP request. Responded status: "
+                                + readValue.getStatus());
+            }
+            
+            if(readValue.getResult() != null){
+            	return Long.parseLong(readValue.getResult());
+            }
+        } catch (Exception e) {
+            throw new «webServiceName.toFirstUpper()»ClientException(e.getMessage(), e);
+        }
+        
+        return null;
+    }    
+    «ELSE-» «REM»handle DELETE method separately«ENDREM»
+	 */
+	public void «fileprefix.toFirstLower()»«this.name.toFirstUpper()»(«getPackagePathForClient(version,resourcePath,fileprefix.toFirstUpper() + this.name.toFirstUpper() + "Parameter")» «fileprefix.toFirstLower()»«this.name.toFirstUpper()»Parameter) throws «webServiceName.toFirstUpper()»ClientException {
+        resource = authenticate(baseUrl + «fileprefix.toFirstLower()»«this.name.toFirstUpper()»Parameter.getUriPath());
+        Form form; 
+        try {
+            form = new Form("_method=«fileprefix.toUpperCase()»&" + «fileprefix.toFirstLower()»«this.name»Parameter.getParameterString(), '&');
+        } catch (Exception e) {
+            throw new «webServiceName.toFirstUpper()»ClientException(e.getMessage(), e);
+        }
+        «IF (fullRestSupport)»resource.delete();«ELSE»resource.post(form.getWebRepresentation());«ENDIF»
+    }
+    «ENDIF-»«ENDIF-»
+«ENDDEFINE»
+
+«DEFINE byteresource(APIVersion version, String fileprefix, Method method, Boolean fullRestSupport, String webServiceName, String resourcePath) FOR Resource»
+    /**
+     * Calls a «method.toString().toUpperCase()»-method for the REST resource {@link «getPackagePathForClient(version,resourcePath,this.name.toFirstUpper() + "Resource")»}.
+     * 
+     * @param «fileprefix.toFirstLower()»«this.name.toFirstUpper()»Parameter
+     *            the parameter to «fileprefix.toFirstLower()» a REST resource.
+     * @return «this.name.toFirstLower()» as byte array
+     * @throws «webServiceName.toFirstUpper()»ClientException
+     *             if streaming fails
+     */
+    public byte[] «fileprefix.toFirstLower()»«this.name.toFirstUpper()»Bytes(«getPackagePathForClient(version,resourcePath,fileprefix.toFirstUpper() + this.name.toFirstUpper() + "Parameter")» «fileprefix.toFirstLower()»«this.name»Parameter)
+    	 	throws «webServiceName.toFirstUpper()»ClientException {
+        InputStream inputStream = null;
+        try {
+	    	resource = authenticate(baseUrl + «fileprefix.toFirstLower()»«this.name»Parameter.getUriPath() + «fileprefix.toFirstLower()»«this.name»Parameter.getParameterString());
+			inputStream = resource.get().getStream();
+            return IOUtils.toByteArray(inputStream);
+        } catch (Exception e) {
+            throw new «webServiceName.toFirstUpper()»ClientException(e.getMessage(), e);
+        } finally {
+            if (inputStream != null) {
+                IOUtils.closeQuietly(inputStream);
+            }
+        }
+    }
+«ENDDEFINE»

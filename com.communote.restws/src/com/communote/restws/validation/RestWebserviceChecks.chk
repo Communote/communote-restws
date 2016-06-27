@@ -1,0 +1,46 @@
+/*
+ * This check file is used to specify constraints for the derived metamodels.
+ * They will be executed by the editor when the user saves a file.
+ * At generation time they will be executed as well.
+ *
+ * Example:
+ *
+ * import myDsl;
+ *
+ * context Class WARNING "Name should start with a capital" :
+ *    name.toFirstUpper() == name;
+ */
+import restWebservice;
+
+extension RestWebserviceExtensions;
+
+context AbstractParameterAttribute#name ERROR 
+	"Attributes and parameter with the name '_method' are not allowed, because of the tunneling of the HTTP methods PUT and DELETE" : 
+	this.name != "_method"
+;
+
+context VersionGroup ERROR 
+	"Dublicated name of a parameter or attribute within a parameter group" : 
+	this.refParameterGroups.select(a|a.parameterGroupValues.select(b| this.refAttributes.select(c|b.name == c.name).size > 0) == true).size < 1
+;
+
+context Resource#resourceId WARNING
+	"The resource ID should have GET, PUT, DELETE methods as mandatory - the generator will use them as mandatory auromatically" :
+	//this.resourceId.content.applyfor.select(e|e.metaType == UseFor).size == 0
+	this.resourceId.content.applyfor.select(e| (e.methodusefor != Method.getStaticProperty("GET_COLLECTION").get()) && (e.methodusefor != Method.getStaticProperty("POST").get())  ).select(e|e.metaType == UseFor).size == 0
+;
+
+context VersionGroup#refAttributes ERROR
+	"Dublicated parameter please check you linked parameter" :
+	this.refAttributes.select(e|   this.refAttributes.select( s| s.name == e.name  ).size > 1  ).size < 2
+;
+
+context VersionGroup#refParameter ERROR
+	"Dublicated parameter please check you linked parameter" :
+	this.refParameter.select(e|   this.refParameter.select( s| s.name == e.name  ).size > 1  ).size < 2
+;
+
+context VersionGroup#refParameterGroups ERROR
+	"Dublicated parameter group please check you linked parameter group" :
+	this.refParameterGroups.select(e|   this.refParameterGroups.select( s| s.name == e.name  ).size > 1  ).size < 2
+;

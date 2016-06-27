@@ -1,0 +1,15 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: com.communote.restws.ide
+Bundle-Description: generic IDE support for editing restws models
+Bundle-Vendor: Communote GmbH
+Bundle-Version: 1.0.8
+Bundle-SymbolicName: com.communote.restws.ide; singleton:=true
+Bundle-ActivationPolicy: lazy
+Require-Bundle: com.communote.restws,
+ org.eclipse.xtext.ide,
+ org.eclipse.xtext.xbase.ide
+Bundle-RequiredExecutionEnvironment: JavaSE-1.8
+Export-Package: com.communote.restws.ide.contentassist.antlr,
+ com.communote.restws.ide.contentassist.antlr.internal
+

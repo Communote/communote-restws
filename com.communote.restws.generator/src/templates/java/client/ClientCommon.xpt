@@ -1,0 +1,68 @@
+«IMPORT restWebservice»
+
+«EXTENSION templates::java::client::ClientExtension»
+«EXTENSION templates::Extensions»
+
+«DEFINE datatypeMapper(APIVersion currentVersion, String packagePath) FOR DataType-»
+	«IF this.resourcetype != null»
+		«getPackagePath(currentVersion, packagePath)-».«this.resourcetype.name.toFirstUpper()-»Resource
+	«ELSE-»
+		«IF this.datatype == Types.getStaticProperty("STRING").get()-»java.lang.String
+		«ELSEIF this.datatype == Types.getStaticProperty("INTEGER").get()-»java.lang.Integer
+		«ELSEIF this.datatype == Types.getStaticProperty("DATE").get()-»java.util.Date
+		«ELSEIF this.datatype == Types.getStaticProperty("LONG").get()-»java.lang.Long
+		«ELSEIF this.datatype == Types.getStaticProperty("DOUBLE").get()-»java.lang.Double
+		«ELSEIF this.datatype == Types.getStaticProperty("BYTE").get()-»java.lang.Double
+		«ELSEIF this.datatype == Types.getStaticProperty("BOOLEAN").get()-»java.lang.Boolean
+		«ENDIF-»
+	«ENDIF-»
+	«IF this.isArray»[]«ENDIF-» 
+«ENDDEFINE»
+
+«DEFINE createGetter(APIVersion currentVersion, String packagePath) FOR AbstractParameterAttribute-»
+	«IF this.content.parameterConstants.isEmpty-»
+	/**
+	 * Returns the «this.name.toFirstUpper()».
+	 * @return the «this.name.toFirstUpper()»
+	 */
+	public «EXPAND datatypeMapper(currentVersion, packagePath) FOR this.type-»get«this.name.toFirstUpper()-»(){
+	«ELSEIF this.type.isArray && this.type.datatype.toString().toLowerCase() == "string"»
+	/**
+	 * Returns List of constants «this.name.toFirstUpper()».
+	 * @return List of constants «this.name.toFirstUpper()»
+	 */
+	public java.util.List<E«this.name.toFirstUpper()»> get«this.name.toFirstUpper()-»(){
+	«ELSE-»
+	/**
+	 * Returns the constant «this.name.toFirstUpper()».
+	 * @return the constant «this.name.toFirstUpper()»
+	 */
+	public E«this.name.toFirstUpper()» get«this.name.toFirstUpper()-»(){
+	«ENDIF-»
+		return this.«this.name-»;
+	}	
+«ENDDEFINE»
+
+«DEFINE createSetter(APIVersion currentVersion, String packagePath) FOR AbstractParameterAttribute-»
+	«IF this.content.parameterConstants.isEmpty-»
+	/**
+	 * Sets «this.name.toFirstUpper()».
+	 * @param «this.name»
+	 */
+	public void set«this.name.toFirstUpper()-»(«EXPAND datatypeMapper(currentVersion, packagePath) FOR this.type-» «this.name-»){
+	«ELSEIF this.type.isArray && this.type.datatype.toString().toLowerCase() == "string"»
+	/**
+	 * List of constants «this.name.toFirstUpper()».
+	 * @param the constants «this.name»
+	 */
+	public void set«this.name.toFirstUpper()»( java.util.List<E«this.name.toFirstUpper()»> «this.name» ){
+	«ELSE-»
+	/**
+	 * Sets the constant «this.name.toFirstUpper()».
+	 * @param the constant «this.name»
+	 */
+	public void set«this.name.toFirstUpper()-»(E«this.name.toFirstUpper()» «this.name-»){
+	«ENDIF-»
+		this.«this.name-» = «this.name-»;
+	}
+«ENDDEFINE»

@@ -1,0 +1,372 @@
+«IMPORT restWebservice»
+
+«EXTENSION templates::documentation::DocExtension»
+«EXTENSION templates::Extensions»
+
+«REM»This template parses a whole webservice for documentation «ENDREM»
+«DEFINE docmain FOR RestWebservice»
+    «REM»Store the current version to a variable«ENDREM»
+    «LET getApiVersionFormString(this, (String) GLOBALVAR selectedAPIVersion ) AS currentVersion-»
+        «REM»Write the CSS file with the style of the documentation«ENDREM»
+        «FILE getCSSFullPath((APIVersion)currentVersion, "design", "css")-»
+h1{ font-size: 16pt; }
+h2{    font-size: 13pt; }
+h3{    font-size: 12pt; }
+body{ font-size: 11pt; }
+b{ font-size: 11pt;    }
+table{ font-size: 11pt; }
+th{font-size: 13pt;}
+th span{font-size: 12pt; font-weight: normal;}
+p{ font-size: 11pt; }
+div.linklist{ font-size:0.80em;}
+div.description{margin-left: 20px;}
+label{margin-left: 20px;}
+ul { padding:0px; list-style-type:none}
+a.path{ color:black; font-weight:bold; text-decoration:none; border-bottom:1px dotted;}
+.TableHeadingColor     { background: #CCCCFF; color:#000000 } /* Dark mauve */
+.TableHeading2Color    { background: #DDDDEE; color:#000000 }
+tr.mandatory  { background: #fff2cc; }
+tr.mandatory .mandatory{ display: inline !important; }
+        «ENDFILE-»
+        
+«REM» Frameset for navigation and overview «ENDREM»        
+        «FILE getDocPath((APIVersion)currentVersion, "index", "html", null)-»
+        <html>
+        <head><title>«this.name-»-Webservice (Ver: «((APIVersion)currentVersion).name-»)</title>
+        </head>
+        <frameset cols="200,*">
+          <frame src="navigation.html" name="navigation">
+          <frame src="overview.html" name="content">
+          <noframes>
+            <body>
+              <p><a href="overview.html">Overview</a></p>
+            </body>
+          </noframes>
+        </frameset>
+        </html>
+        «ENDFILE»
+        
+«REM» Frame for navigation «ENDREM»    
+        «FILE getDocPath((APIVersion)currentVersion, "navigation", "html", null)-»
+        <html>
+        <head><title>Navigation</title>
+        <link href="«getCSSRefPath((APIVersion)currentVersion, "design", "css")-»" type="text/css" rel="stylesheet" /> 
+        </head>
+        <body>
+        <h2><a name="top">«this.name-»</a>-Webservice</h2>
+        <ul>
+          <li><a href="overview.html" target="content">Overview</a></li>
+        </ul>
+        <h3>Resources</h3>
+        <ul>
+          «FOREACH resources AS resource-»
+              «IF checkResourceForVersion((APIVersion)currentVersion, (Resource)resource )-»
+           	   «"<li><a href='" + ((Resource) resource).name.toLowerCase() + "/" + ((Resource)resource).name.toLowerCase()+".html' target='content'>"+((Resource)resource).name+"</a><br />"-»
+            	«getFormattedResourceBreadcrumbs((APIVersion)currentVersion, (Resource)resource, "").toString()-»
+                «IF ((Resource) resource).name.toFirstLower().endsWith("y") »
+                «EXPAND resourceTemplate ((APIVersion)currentVersion, "<a class='path' href='#relPath#" + ((Resource) resource).name.toLowerCase() + "/" + ((Resource) resource).name.toLowerCase() + ".html' target='content'>" + ((Resource) resource).name.toFirstLower()+"ies" + "</a>", ((Resource) resource).name.toLowerCase(), "../" ) FOR (Resource)resource -»
+                «ELSE»
+                «EXPAND resourceTemplate ((APIVersion)currentVersion, "<a class='path' href='#relPath#" + ((Resource) resource).name.toLowerCase() + "/" + ((Resource) resource).name.toLowerCase() + ".html' target='content'>" + ((Resource) resource).name.toFirstLower()+"s" + "</a>", ((Resource) resource).name.toLowerCase(), "../" ) FOR (Resource)resource -»
+                «ENDIF»
+                </li>    
+            «ENDIF-»
+          «ENDFOREACH-»
+        </ul>
+        
+        </body>
+        </html>
+        «ENDFILE»
+    
+        «REM» This part is responsible for writing the index file of the documentation «ENDREM»
+        «FILE getDocPath((APIVersion)currentVersion, "overview", "html", null)-»
+            «LET "<div class=\"linklist\"><a href=\"#top\">[top]</a> <a href=\"#resources\">[resources]</a> <a href=\"#properties\">[properties]</a> <a href=\"#versions\">[API versions]</a> <a href=\"#tunneling\">[Tunneling]</a></div>" AS subNavigation »
+            <html><head><title>«this.name-»-Webservice (Ver: «((APIVersion)currentVersion).name-»)</title>
+            <link href="«getCSSRefPath((APIVersion)currentVersion, "design", "css")-»" type="text/css" rel="stylesheet" /> 
+            </head>
+                <body> 
+                <h1><a name="top">«this.name-»</a>-Webservice <font size= "-2">(Version: «((APIVersion)currentVersion).name.replaceAll("_",".")-»)</font></h1>
+                «subNavigation»
+                <h2>Description</h2>
+                    «this.doc.description-»
+                «REM» This part is responsible for parsing the resources «ENDREM»    
+                <br /><br />
+                <TABLE BORDER="1" WIDTH="100%" CELLPADDING="3" CELLSPACING="0" SUMMARY="">
+                    <TR BGCOLOR="#CCCCFF" CLASS="TableHeadingColor">
+                        <TH ALIGN="left" COLSPAN="3">
+                            <a name="resources">Resources</a>
+                        </TH>
+                    </TR>
+                    «FOREACH resources AS resource-»
+                        <tr><td>
+                    «REM»    «getParameterFromGroup(resource.parameters, resource, this)»«ENDREM»
+                        «IF checkResourceForVersion((APIVersion)currentVersion, (Resource)resource )-»
+                            «"<b><a href="+ ((Resource)resource).name.toLowerCase() + "/" +((Resource)resource).name.toLowerCase()+".html>"+((Resource)resource).name+"</a></b> <br />"-»
+                            «getFormattedResourceBreadcrumbs((APIVersion)currentVersion, (Resource)resource, "").toString()-»
+                            «IF ((Resource) resource).name.toFirstLower().endsWith("y") »
+                            «EXPAND resourceTemplate ((APIVersion)currentVersion, "<a class='path' href='#relPath#" + ((Resource) resource).name.toLowerCase() + "/" +  ((Resource) resource).name.toLowerCase() + ".html'>" + ((Resource) resource).name.toFirstLower()+"ies" + "</a>", ((Resource) resource).name.toLowerCase() , "../") FOR (Resource)resource -»
+                            «ELSE»
+                            «EXPAND resourceTemplate ((APIVersion)currentVersion, "<a class='path' href='#relPath#" + ((Resource) resource).name.toLowerCase() + "/" +  ((Resource) resource).name.toLowerCase() + ".html'>" + ((Resource) resource).name.toFirstLower()+"s" + "</a>", ((Resource) resource).name.toLowerCase(), "../" ) FOR (Resource)resource -»
+                    		«ENDIF»
+                        «ENDIF-»
+                        </td></tr>
+                    «ENDFOREACH-»
+                    </table>
+                    «subNavigation»                    
+
+                «REM» This is the part that reads out all the properties for the webservice and lists them in a table «ENDREM»
+                    <br />
+                    <TABLE BORDER="1" WIDTH="100%" CELLPADDING="3" CELLSPACING="0" SUMMARY="">
+                    <TR BGCOLOR="#CCCCFF" CLASS="TableHeadingColor">
+                        <TH ALIGN="left" COLSPAN="3">
+                            <a name="properties">Properties</a>
+                        </TH>
+                    </TR>
+                        <tr>
+                            <td width="10%">REST fully supported:</td>
+                            <td><b>«this.fullRestSupport-»</b>,<br/> 
+                                «IF this.fullRestSupport-»
+                                i.e. every HTTP methods (POST, PUT, GET, DELETE) is supported. 
+                                «ELSE-»
+                                i.e. only HTTP-POST and HTTP-GET is supported by the server. Therefore HTTP-PUT and HTTP-DELETE requests have to be tunneled into a HTTP-POST request with the parameter <tt>?_method=DELETE</tt> or <tt>?_method=PUT</tt>.
+                                «ENDIF-»
+                            </td>
+                        </tr>
+                        <tr>
+                            <td valign="top">Supported MIME-Types:</td>
+                            <td>
+                                <table>
+                                    «FOREACH mimeTypes AS mime-»
+                                    <tr>
+                                        <td>
+                                            «((MimeType) mime).mime-»
+                                        </td>
+                                        <td>(
+                                            «REM»list all the mime type with extensions«ENDREM»
+                                            «FOREACH ((MimeType) mime).ext AS extension SEPARATOR ","-»
+                                                «extension-»
+                                            «ENDFOREACH-»
+                                        )</td>
+                                    </tr>
+                                    «ENDFOREACH-» 
+                                </table>
+                            
+                            </td>
+                        </tr>
+                    </table>
+                    «subNavigation»                    
+    «REM» This part ist responsible for the API versions  «ENDREM»                
+                    <br />
+                    <TABLE BORDER="1" WIDTH="100%" CELLPADDING="3" CELLSPACING="0" SUMMARY="">
+                    <TR BGCOLOR="#CCCCFF" CLASS="TableHeadingColor">
+                        <TH ALIGN="left" COLSPAN="3">
+                            <a name="versions">All available API versions</a>
+                        </TH>
+                    </TR>
+                    «FOREACH apiVersions AS apiversion-»
+                        <tr><td width = "10%">
+                        «((APIVersion)apiversion).name.replaceAll("_",".")-»<br />
+                        </td>
+                        <td>
+                            «((APIVersion)apiversion).doc.description-»
+                        </td></tr>
+                    «ENDFOREACH-»
+                    </table>
+                    <font size="-2">For further details about other API versions see the according documentation</font>
+                    «subNavigation»
+                    <br />
+
+                    <table BORDER="1" WIDTH="100%" CELLPADDING="3" CELLSPACING="0" SUMMARY="">
+                    <TR BGCOLOR="#CCCCFF" CLASS="TableHeadingColor">
+                        <TH ALIGN="left" COLSPAN="3">
+                            <a name="tunneling">Tunneling</a>
+                        </TH>
+                    </TR>
+                    <tr>
+                        <td>
+                            Some servers or proxies don't allow the use of other HTTP methods than GET and POST, also many browsers only support GET and POST.
+                            To circumvent this problem it is possible to use a technique called <b>tunneling</b>. Instead of sending the request using the intended 
+                            method, for instance PUT, the request will be send as POST and the intended method will be set as GET parameter <i>_method</i>.<br /><br />
+                            Please refer to the servers documentation to find out, if you have to use tunneling for your requests. This documentation was generated with
+                            tunneling <b>«IF this.fullRestSupport»disabled«ELSE»enabled«ENDIF»</b>.
+                        <td>
+                    </tr>
+                    <tr CLASS="TableHeading2Color">
+                        <th align="left" COLSPAN="3">Usage</span></th>
+                    </tr>
+                    <tr><td>
+                      Send the request as <b>POST</b> and set the intended method as URL parameter <b>_method</b>. Send all parameters as POST parameters.<br />
+                        <b>Example</b><br />
+                        Instead of sending a request as<br />
+                        <pre>PUT «getExampleBaseUrl()»/«resources.get(0).name.toFirstLower()+"s"»/42</pre>
+                        send it as 
+                        <pre>POST «getExampleBaseUrl()»/«resources.get(0).name.toFirstLower()+"s"»/42?_method=PUT</pre>
+                    </td></tr>
+                    </table>
+                    «subNavigation»
+                </body>
+            </html>
+            «ENDLET»
+        «ENDFILE»
+    «ENDLET»
+«ENDDEFINE»
+
+«REM»This template parses a single resource with its properties, attributes, parameters, and assoziated ressources. «ENDREM»
+«DEFINE resourceTemplate (APIVersion version, String currentResourceCollectionPath, String filePath, String relPath) FOR Resource»
+    «REM»Get the path to the resource documentation files an create a single file for each resource«ENDREM»
+    «FILE getDocPath((APIVersion)version, this.name.toLowerCase(), "html", filePath)-»
+        <html><head><title>«this.name-» Resource (Ver: «((APIVersion)version).name-»)</title>
+        <link href="../css/design.css" type="text/css" rel="stylesheet" /> 
+        </head><body>
+            <h1><a name="top">«this.name.toFirstUpper()-» <font size= "-2">(Version: «((APIVersion)version).name.replaceAll("_",".")-»)</font></h1>
+            <div class="linklist"><a href="#post">[post]</a> <a href="#put">[put]</a> <a href="#get">[get]</a> <a href="#list">[list]</a> <a href="#delete">[delete]</a></div>
+            <p>«this.doc.description-»</p>
+            <TABLE BORDER="1" WIDTH="100%" CELLPADDING="3" CELLSPACING="0" SUMMARY="">
+                    <TR BGCOLOR="#CCCCFF" CLASS="TableHeadingColor">
+                        <TH ALIGN="left" COLSPAN="3">
+                            Resource access
+                        </TH>
+                    </TR>
+                <tr>
+                    <td valign="top" width="30%">
+                        <b>Resource collection</b> (LIST):
+                    </td>
+                    <td>
+                        &lt;protocol&gt;://&lt;baseuri&gt;/<b>«currentResourceCollectionPath.replaceAll("#relPath#", relPath)-»</b>«REM».&lt;mime-type&gt;«ENDREM»
+                    </td>
+                </tr>
+                <tr>
+                    <td valign="top">
+                        <b>Resource</b> (POST, PUT, GET, DELETE):
+                    </td>
+                    <td>
+                        &lt;protocol&gt;://&lt;baseuri&gt;/<b>«currentResourceCollectionPath.replaceAll("#relPath#", relPath)-»/{«this.resourceId.first().name-»}</b>«REM».&lt;mime-type&gt;«ENDREM»
+                    </td>
+                </tr>
+                <tr>
+                    <td valign="top">
+                        <b>Example:</b>
+                    </td>
+                    <td>
+                        «getExampleBaseUrl()»/«currentResourceCollectionPath.replaceAll("#relPath#", relPath).replaceAll("\\{[A-Za-z]*\\}","2")-»<br />
+                        «getExampleBaseUrl()»/«currentResourceCollectionPath.replaceAll("#relPath#", relPath).replaceAll("\\{[A-Za-z]*\\}","2")-»/0
+                    </td>
+                </tr>
+            </table>
+            <br />
+
+            «REM»Create the breadcrums for navigation«ENDREM»
+            «IF this.subResources.size > 0-»
+            <TABLE BORDER="1" WIDTH="100%" CELLPADDING="3" CELLSPACING="0" SUMMARY="">
+                    <TR BGCOLOR="#CCCCFF" CLASS="TableHeadingColor">
+                        <TH ALIGN="left" COLSPAN="3">
+                            Sub resources
+                        </TH>
+                    </TR>
+                «FOREACH this.subResources AS subresource-»
+                    <tr><td>
+                    «IF checkResourceForVersion((APIVersion)version, (Resource)subresource )-»
+                             «"<a href=" + ((Resource)subresource).name.toLowerCase() + "/" + ((Resource)subresource).name.toLowerCase() + ".html>" +  ((Resource)subresource).name + "</a>"-» <br />
+                            «getFormattedResourceBreadcrumbs( (APIVersion)version ,(Resource)subresource, "").toString()-»
+                            «IF ((Resource) subresource).name.toFirstLower().endsWith("y") »
+                            «EXPAND resourceTemplate ((APIVersion)version, currentResourceCollectionPath+"/{"+this.resourceId.first().name+"}/"+"<a class='path' href='#relPath#" + filePath + "/" + ((Resource) subresource).name.toLowerCase() + "/" + ((Resource) subresource).name.toLowerCase() + ".html'>" + ((Resource) subresource).name.toFirstLower().subString(0,subresource.name.length-1) + "ies" + "</a>", filePath + "/" + ((Resource) subresource).name.toLowerCase(), relPath + "../" ) FOR (Resource)subresource-»
+                            «ELSE»
+                            «EXPAND resourceTemplate ((APIVersion)version, currentResourceCollectionPath+"/{"+this.resourceId.first().name+"}/"+"<a class='path' href='#relPath#" + filePath + "/" + ((Resource) subresource).name.toLowerCase() + "/" + ((Resource) subresource).name.toLowerCase() + ".html'>" + ((Resource) subresource).name.toFirstLower()+"s" + "</a>", filePath + "/" + ((Resource) subresource).name.toLowerCase(), relPath + "../" ) FOR (Resource)subresource-»
+                    		«ENDIF»
+                    «ENDIF-»
+                    </td></tr>
+                «ENDFOREACH-»
+            </table>
+            <div class="linklist"><a href="#top">[top]</a> <a href="#post">[post]</a> <a href="#put">[put]</a> <a href="#get">[get]</a> <a href="#list">[list]</a> <a href="#delete">[delete]</a></div><br />
+            «ENDIF-»
+            «REM» HTTP methods with its description, attributes and parameters «ENDREM»
+            «LET getVersionGroupByVersion( this.versionGroups, version) AS currentVersionGroup-»
+                «EXPAND methodTemplate ("post", currentVersionGroup) FOR this»
+                «EXPAND methodTemplate ("put", currentVersionGroup) FOR this»
+                «EXPAND methodTemplate ("get", currentVersionGroup) FOR this»
+                «EXPAND methodTemplate ("list", currentVersionGroup) FOR this»
+                «EXPAND methodTemplate ("delete", currentVersionGroup) FOR this»
+            «ENDLET»
+        «ENDFILE»
+«ENDDEFINE»
+
+«DEFINE methodTemplate (String method, VersionGroup currentVersionGroup ) FOR Resource»
+«IF currentVersionGroup.refAttributes.content.applyfor.methodusefor.toString().contains(method) || currentVersionGroup.refParameter.content.applyfor.methodusefor.toString().contains(method)-»
+	<TABLE BORDER="1" WIDTH="100%" CELLPADDING="3" CELLSPACING="0" SUMMARY="">
+	    <TR BGCOLOR="#CCCCFF" CLASS="TableHeadingColor">
+	        <TH ALIGN="left" COLSPAN="3">
+	            <a name="«method.toLowerCase()»">«method.toUpperCase()»</a>
+	        </TH>
+	    </TR>
+	
+	    «REM» Add HTTP method specific documentation, if available «ENDREM»
+	    «FOREACH docMethod AS docm-»
+	        «IF docm.docMethod.toString().matches(method)-»
+	            <tr>
+	                <td colspan="3"> 
+	                   «docm.description»
+	                   «IF !method.toLowerCase().matches("get") && !method.toLowerCase().matches("post") »<br /><br />
+	                   Please notice the documentation for <a href="overview.html#tunneling"><b>tunneling</b></a>, if you encounter any problems invoking «method» requests on your server.
+	                   «ENDIF»
+	                 </td>
+	            </tr>
+	        «ENDIF»
+	    «ENDFOREACH»
+	
+	    «IF currentVersionGroup.refAttributes.content.applyfor.methodusefor.toString().contains(method)-»
+	        <TR CLASS="TableHeading2Color">
+	            <TH ALIGN="left" COLSPAN="3">Attributes <span>(Attributes are part of the entity send or requested.)</span></TD>
+	        </TR>
+	        «FOREACH currentVersionGroup.refAttributes AS attribute-»
+	            «EXPAND paramAttrTemplate (method) FOR (AbstractParameterAttribute)attribute -»
+	        «ENDFOREACH-»
+	    «ENDIF-»
+	    «IF currentVersionGroup.refParameter.content.applyfor.methodusefor.toString().contains(method)-»
+	        <TR CLASS="TableHeading2Color">
+	            <TH ALIGN="left" COLSPAN="3">Parameters <span>(Parameters are generally used to filter the result and are not part of the result set.)</span></TD>
+	        </TR>
+	        «FOREACH currentVersionGroup.refParameter AS parameter-»
+	            «EXPAND paramAttrTemplate (method) FOR (AbstractParameterAttribute)parameter -»
+	        «ENDFOREACH-»
+	    «ENDIF-»
+	</table>
+	<div class="linklist"><a href="#top">[top]</a> <a href="#post">[post]</a> <a href="#put">[put]</a> <a href="#get">[get]</a> <a href="#list">[list]</a> <a href="#delete">[delete]</a></div><br />
+«ENDIF»
+«ENDDEFINE»
+
+«REM»
+    This template has the inner table structure of the paramater and attribute tables
+    | data type  | attribute name and description   | http methods |
+«ENDREM»
+«DEFINE paramAttrTemplate (String method) FOR AbstractParameterAttribute-»
+    «IF this.content.applyfor.methodusefor.toString().contains(method) && !checkResourceForDummyParameterAttribute(this)»
+    <tr «FOREACH this.content.applyfor AS methods-»
+            «IF methods.methodusefor.toString().contains(method)»
+                «FOREACH methods.metaType.allProperties AS feature-»
+                    «IF feature.name.contains("mandatory")-»class="mandatory"«ENDIF-»
+                «ENDFOREACH»
+            «ENDIF»«ENDFOREACH»>
+        <td valign="top" align="right" width=10%>
+            <tt>
+                «IF((DataType)((AbstractParameterAttribute)this).type).resourcetype != null-»
+                    «((DataType)((AbstractParameterAttribute)this).type).resourcetype.name-»«IF((DataType)((AbstractParameterAttribute)this).type).isArray-»[]«ENDIF-»
+                «ELSE-»
+                    «((DataType)((AbstractParameterAttribute)this).type).datatype-»«IF((DataType)((AbstractParameterAttribute)this).type).isArray-»[]«ENDIF-»
+                «ENDIF-»
+            </tt> 
+        </td>
+        <td>
+            <b>«((AbstractParameterAttribute)this).name-»</b><span class="mandatory" style="display:none;"> (mandatory)</span><br />
+            <div class="description">«((AbstractParameterAttribute)this).content.doc.description-»</div>
+            «IF ((AbstractParameterAttribute)this).content.parameterConstants.isEmpty == false»
+                Constant Values:
+                <div class="description">
+                <table>
+                «FOREACH ((AbstractParameterAttribute)this).content.parameterConstants AS constantValue-» 
+                    <tr><td>«constantValue.value + ": </td><td>" + constantValue.doc.description + "</td></tr>"-»
+                «ENDFOREACH»
+                </table></div>
+            «ENDIF»
+        </td>
+    </tr>
+    «ENDIF»
+«ENDDEFINE»

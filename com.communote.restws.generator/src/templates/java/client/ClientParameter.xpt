@@ -1,0 +1,254 @@
+«IMPORT restWebservice»
+
+«EXTENSION templates::java::client::ClientExtension»
+«EXTENSION templates::Extensions»
+
+«REM»
+This template block calls another template block to generate the different parameter classes
+Generation steps:
+	- calls the template for the generation of the diffenent parameter classes diffent times with different parameters
+	@param version - current API version object is needed for the version check and the file path
+	@param path - is the path adress of the current processing it is used for determine the address path as return value
+«ENDREM»
+«DEFINE parametertemplate(APIVersion version, Boolean fullRestSupport, String filePath, String uriPath) FOR Resource»
+	«REM»This are special parameter classes for a resource to be created«ENDREM»
+	«IF hasMethod(this.resourceId.first(), (Method)Method.getStaticProperty("GET").get())» 
+		«EXPAND parameterclasses(version, "Get", 			(Method)Method.getStaticProperty("GET").get(), fullRestSupport, filePath, uriPath) FOR this»
+	«ENDIF»
+	«IF hasMethod(this.resourceId.first(), (Method)Method.getStaticProperty("PUT").get())» 
+		«EXPAND parameterclasses(version, "Edit", 			(Method)Method.getStaticProperty("PUT").get(), fullRestSupport, filePath, uriPath) FOR this»
+	«ENDIF»
+	«IF hasMethod(this.resourceId.first(), (Method)Method.getStaticProperty("DELETE").get())» 
+		«EXPAND parameterclasses(version, "Delete", 		(Method)Method.getStaticProperty("DELETE").get(), fullRestSupport, filePath, uriPath) FOR this»
+	«ENDIF»
+	«IF  isCreationAvailable(version, this, (Method)Method.getStaticProperty("POST").get())»
+		«EXPAND parameterclasses(version, "Create", 		(Method)Method.getStaticProperty("POST").get(), fullRestSupport, filePath, uriPath) FOR this»
+	«ENDIF»
+	«IF  isCreationAvailable(version, this, (Method)Method.getStaticProperty("GET_COLLECTION").get())»
+		«EXPAND parameterclasses(version, "GetCollection", 	(Method)Method.getStaticProperty("GET_COLLECTION").get(), fullRestSupport, filePath, uriPath) FOR this»
+	«ENDIF»
+«ENDDEFINE»
+
+«REM»
+This template block is used to generate the different parameter classes for a resource
+Generation steps:
+	- writing the class attributes consisting of the attributes and parameters that are label for the corresponding HTTP method (at the beginning use the resource ids of the resource and the parent resources afterwards take the other parameters(attributes)
+	- define the get_uri_path method (that is called while using this method)
+	- define the get_parameter_string method (provides a string containing all set parameter with value and key)
+	- define the is_valid_parameter_list method (checks if all the mandatory parameter are set)
+	@param version - current API version object is needed for the version check and the file path
+	@param fileprefix - is a string that is put in front of the resource name which makes out the file and class name. Will be used for indication for what HTTP method the class is supposed to
+	@param method - is the HTTP method for which the generation will be done
+	@param path - 
+«ENDREM»
+«DEFINE parameterclasses(APIVersion version, String fileprefix, Method method, Boolean fullRestSupport, String filePath, String uriPath) FOR Resource»
+	«FILE getFilePath(version, fileprefix, "Parameter", this, filePath)»
+package «getPackagePath((APIVersion)version,filePath)»;
+import «getServletImportPath(version, this)»MethodParameter;
+import «getServletImportPath(version, this)»Util;
+import org.apache.commons.codec.EncoderException;
+import org.apache.commons.codec.net.URLCodec;
+
+import org.codehaus.jackson.JsonGenerationException;
+import org.codehaus.jackson.annotate.JsonIgnore;
+import org.codehaus.jackson.map.JsonMappingException;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.map.annotate.JsonSerialize;
+
+import java.io.IOException;
+
+/**
+ * The «fileprefix + this.name»Parameter is used to create HTTP requests for «this.name.toLowerCase()»s.
+ */
+public class «fileprefix + this.name»Parameter extends MethodParameter {
+		«FOREACH this.resourceId  AS resourceid-»
+		  	«IF(resourceid == this.resourceId.first() && hasMethod(resourceid, method) ||  resourceid != this.resourceId.first())-»
+		  		«IF resourceid.content.parameterConstants.isEmpty-»
+					private «EXPAND templates::java::client::ClientCommon::datatypeMapper(version, filePath) FOR resourceid.type» «resourceid.name.toFirstLower()»;
+				«ELSE»
+					private E«resourceid.name.toFirstUpper()-» «resourceid.name.toFirstLower()-»;
+				«ENDIF»
+			«ENDIF»
+	  	«ENDFOREACH-»
+	  	
+		«LET getVersionGroupByVersion(this.versionGroups, version) AS versionGroup-»
+	  		«FOREACH ((VersionGroup)versionGroup).refAttributes  AS attr-»
+	  			«IF hasMethod(attr, method) && attr != this.resourceId.first()-»
+					«IF attr.content.parameterConstants.isEmpty»
+						«IF this.subResources.select(sR|sR.name == attr.type.resourcetype.name).size > 0 »
+							private «EXPAND templates::java::client::ClientCommon::datatypeMapper(version, getPackageOfResourceAttribute(filePath, attr)) FOR attr.type-» «attr.name.toFirstLower()»;
+						«ELSE»
+							private «EXPAND templates::java::client::ClientCommon::datatypeMapper(version, attr.type.resourcetype.name.toLowerCase()) FOR attr.type-» «attr.name.toFirstLower()»;
+						«ENDIF»
+					«ELSEIF attr.type.isArray && attr.type.datatype.toString().toLowerCase() == "string"»
+	private java.util.List<E«attr.name.toFirstUpper()»> «attr.name.toFirstLower()»;
+					«ELSE»
+	private E«attr.name.toFirstUpper()» «attr.name.toFirstLower()»;
+					«ENDIF»
+				«ENDIF-»
+	  		«ENDFOREACH-»
+	  		
+			«FOREACH ((VersionGroup)versionGroup).refParameter  AS param-»
+				«IF hasMethod(param,method )-»
+					«IF param.content.parameterConstants.isEmpty»
+						«IF this.subResources.select(sR|sR.name == param.type.resourcetype.name).size > 0 »
+							private «EXPAND templates::java::client::ClientCommon::datatypeMapper(version, getPackageOfResourceParameter(filePath, param)) FOR param.type-» «param.name.toFirstLower()»;
+						«ELSE»
+							private «EXPAND templates::java::client::ClientCommon::datatypeMapper(version, filePath) FOR param.type-» «param.name.toFirstLower()»;
+						«ENDIF»
+					«ELSEIF param.type.isArray && param.type.datatype.toString().toLowerCase() == "string"»
+	private java.util.List<E«param.name.toFirstUpper()»> «param.name.toFirstLower()»;
+					«ELSE»
+	private E«param.name.toFirstUpper()» «param.name.toFirstLower()»;
+					«ENDIF»
+				«ENDIF-»
+			«ENDFOREACH-»
+			
+	«REM»Create getter and setter for resource ids...«ENDREM»
+			«FOREACH this.resourceId  AS resourceid-»
+		  		«IF(resourceid == this.resourceId.first() && hasMethod(resourceid, method) ||  resourceid != this.resourceId.first())»
+					«EXPAND templates::java::client::ClientCommon::createSetter(version, filePath) FOR resourceid-»
+					«EXPAND templates::java::client::ClientCommon::createGetter(version, filePath) FOR resourceid-»
+		  		«ENDIF»
+		  	«ENDFOREACH-»
+		  	«FOREACH ((VersionGroup)versionGroup).refParameter AS param-»
+		  		«IF(hasMethod(param, method))»
+					«IF this.subResources.select(sR|sR.name == param.type.resourcetype.name).size > 0 »
+						«EXPAND templates::java::client::ClientCommon::createSetter(version, getPackageOfResourceParameter(filePath, param)) FOR param-»
+						«EXPAND templates::java::client::ClientCommon::createGetter(version, getPackageOfResourceParameter(filePath, param)) FOR param-»
+					«ELSE»
+						«EXPAND templates::java::client::ClientCommon::createSetter(version, param.type.resourcetype.name.toLowerCase()) FOR param-»
+						«EXPAND templates::java::client::ClientCommon::createGetter(version, param.type.resourcetype.name.toLowerCase()) FOR param-»
+					«ENDIF»
+		  		«ENDIF»
+		  	«ENDFOREACH-»
+		  	«FOREACH ((VersionGroup)versionGroup).refAttributes AS attr-»
+		  		«IF(attr != this.resourceId.first() && hasMethod(attr, method))»
+					«IF this.subResources.select(sR|sR.name == attr.type.resourcetype.name).size > 0 »
+						«EXPAND templates::java::client::ClientCommon::createSetter(version, getPackageOfResourceAttribute(filePath, attr)) FOR attr-»
+						«EXPAND templates::java::client::ClientCommon::createGetter(version, getPackageOfResourceAttribute(filePath, attr)) FOR attr-»
+					«ELSE»
+						«EXPAND templates::java::client::ClientCommon::createSetter(version, attr.type.resourcetype.name.toLowerCase()) FOR attr-»
+						«EXPAND templates::java::client::ClientCommon::createGetter(version, attr.type.resourcetype.name.toLowerCase()) FOR attr-»
+					«ENDIF»
+		  		«ENDIF»
+		  	«ENDFOREACH-»
+	
+	/**
+	 * Returns the URI to identify the {@link «this.name.toLowerCase().toFirstUpper()»Resource}.
+	 * @return the URI
+	 */
+	@JsonIgnore
+	public java.lang.String getUriPath() {
+		if(!isValidParameterList()) {
+			throw new java.lang.IllegalArgumentException();
+		}
+
+  	«IF (method == ((Method)Method.getStaticProperty("DELETE").get()) || method == ((Method)Method.getStaticProperty("PUT").get()) && !fullRestSupport)» 
+    	return "/«uriPath»/" + «this.resourceId.first().name.toFirstLower()».toString() + "?_method=«method.toString().toUpperCase()»";
+    «ELSE»
+    	«IF (method == ((Method)Method.getStaticProperty("GET").get())) » 
+    		return "/«uriPath»/" + «this.resourceId.first().name.toFirstLower()».toString();
+    	«ELSE»
+    		return "/«uriPath»";
+    	«ENDIF»
+    «ENDIF»
+	}
+  
+  	/**
+  	 * Returns the parameters as a concatenated string.
+  	 * @return the concatenated parameters
+  	 */
+  	@JsonIgnore
+	public java.lang.String getParameterString() throws EncoderException {
+		if(!isValidParameterList()) {
+  			throw new java.lang.IllegalArgumentException();
+		}
+	    «IF (method == ((Method)Method.getStaticProperty("GET").get()) || method == ((Method)Method.getStaticProperty("GET_COLLECTION").get()) )»
+	    java.lang.String paramList = "?";
+	    «ELSE»
+	    java.lang.String paramList = "";
+	    «ENDIF»
+	    URLCodec urlCodec = new URLCodec();
+	    
+	    «IF (method == ((Method)Method.getStaticProperty("POST").get()) || method == ((Method)Method.getStaticProperty("GET_COLLECTION").get()) ) && hasMethod(this.resourceId.first(), method)»
+		if («this.resourceId.first().name.toFirstLower()» != null)
+			paramList = "«this.resourceId.first().name»="+«this.resourceId.first().name.toFirstLower()»+"&";
+	    «ENDIF»
+	    		«FOREACH ((VersionGroup)versionGroup).refAttributes  AS attr-»
+		  			«IF hasMethod(attr, method) && attr != this.resourceId.first() -»
+		  				«IF attr.type.isArray»
+		if («attr.name.toFirstLower()» != null)
+			paramList += Util.toParamList(«attr.name.toFirstLower()»,"«attr.name»");		
+						«ELSE»
+	  	if («attr.name.toFirstLower()» != null)
+			paramList += "«attr.name»="+«attr.name.toFirstLower()»+"&";
+		  				«ENDIF»
+					«ENDIF-»
+		  		«ENDFOREACH-»
+				«FOREACH ((VersionGroup)versionGroup).refParameter  AS param-»
+					«IF hasMethod(param,method )-»
+						«IF param.type.isArray»
+		if («param.name.toFirstLower()» != null)
+			paramList += Util.toParamList(«param.name.toFirstLower()»,"«param.name»");
+	  					«ELSEIF param.type.datatype.toString().matches("date")»
+	  	if («param.name.toFirstLower()» != null)
+	  		paramList += "«param.name»="+«param.name.toFirstLower()».getTime()+"&";
+  			  			«ELSEIF param.type.datatype.toString().matches("string") && !param.name.endsWith("Type") && param.content.parameterConstants.isEmpty»
+	  	if («param.name.toFirstLower()» != null)
+	  		paramList += "«param.name»="+urlCodec.encode(«param.name.toFirstLower()»)+"&";
+	  					«ELSE»
+	  	if («param.name.toFirstLower()» != null)
+	  		paramList += "«param.name»="+«param.name.toFirstLower()»+"&";
+	  					«ENDIF»
+					«ENDIF-»
+				«ENDFOREACH-»
+    
+    	if(paramList.length() >= 1){
+    		return paramList.substring(0, paramList.length()-1);
+    	}
+    	else{
+    		return paramList;
+    	}
+	}
+  
+  	/**
+  	 * Checks, if list of parameters is complete and valid.
+  	 * @return <tt>true</tt> if the parameter list is valid.
+  	 */
+  	@JsonIgnore
+	public java.lang.Boolean isValidParameterList() {
+		java.lang.Boolean isValid = true;
+	    	«FOREACH this.resourceId  AS resourceid-»
+	    		«IF(resourceid == this.resourceId.first() && hasMethod(resourceid, method) && isMandatory(resourceid, method) ||  resourceid != this.resourceId.first())-»
+		if («resourceid.name.toFirstLower()» == null)
+			isValid = false;
+				«ENDIF» 		
+		  	«ENDFOREACH-»
+    		«FOREACH ((VersionGroup)versionGroup).refAttributes  AS attr-»
+	  			«IF hasMethod(attr, method) && isMandatory(attr, method) && attr != this.resourceId.first() -»
+		if («attr.name.toFirstLower()» == null)
+			isValid = false;
+				«ENDIF-»
+	  		«ENDFOREACH-»
+			«FOREACH ((VersionGroup)versionGroup).refParameter  AS param-»
+				«IF hasMethod(param,method ) && isMandatory(param, method)-»
+		if («param.name.toFirstLower()» == null)
+			isValid = false;
+				«ENDIF-»
+			«ENDFOREACH-»
+		return isValid;
+	}
+
+	@JsonIgnore
+	public String getResourceJSONRepresentation() throws JsonGenerationException, JsonMappingException, IOException {
+		ObjectMapper mapper=new ObjectMapper();
+		mapper.getSerializationConfig().setSerializationInclusion(
+                JsonSerialize.Inclusion.NON_NULL);			
+		return mapper.writeValueAsString(this);
+	}
+}
+	  «ENDLET-»  
+	«ENDFILE»
+	
+«ENDDEFINE»

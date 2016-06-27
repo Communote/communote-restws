@@ -1,0 +1,103 @@
+/**
+*	This file privides general functonality that will be used from all templates. 
+*	@author Matthias Günther
+* 	@date August 2010
+**/
+
+import restWebservice;
+
+/**
+*	This method prvides you a APIVersion instance for a string where the string equals the name of the API version
+*	@param ws - a web service with a set of API versions
+*	@param apiversion - a string with the name of an API version of which you want to have the instance
+**/
+getApiVersionFormString(RestWebservice ws,  String apiversion):
+	ws.apiVersions.select(e| ((APIVersion)e).name == apiversion).first()
+;
+
+/**
+*	This method provides you the Version group in which the search API version is includes. (used to the the ref objects  of a version group)
+*	@param versiongroups - a list of version groups in which the API version might be includes
+*	@param version - the API version that might be includes in the version group
+**/
+VersionGroup getVersionGroupByVersion(List[VersionGroup] versiongroups, APIVersion version):
+	versiongroups.select(e|((VersionGroup)e).refVersion == version).first()
+;
+
+/**
+*	This method provides a true or false depending if in one version group of a resource is a specified API version included
+*	@param ver - is the API version that you want to check if it is referend by a resources version group
+*	@param resource - is the resource you want to know if it has elements in a specified API version
+**/
+checkResourceForVersion(APIVersion ver, Resource resource):
+	resource.versionGroups.collect( e|  ((VersionGroup)e).refVersion ).contains(ver)
+;
+
+/**
+*	This method checks for the property dummy for an resource
+*	@param resource - is the resource you want to know if it has elements in a specified API version
+**/
+checkResourceForDummyProperty(Resource resource):
+	resource.property.propertyValue.toString() == "dummy"
+;
+
+/**
+* This method checks for the property dummy for an attribute or parameter
+* @param prop - the parameter or attribute that will be checked for a method
+**/
+checkResourceForDummyParameterAttribute(AbstractParameterAttribute prop):
+	prop.content.property.propertyValue.toString() == "dummy"
+;
+/**
+* This method checks if a parameter or an attribute is dedicated for a specified method
+* @param prop - the parameter or attribute that will be checked for a method
+* @param method - is the HTTP method for which the prop will be checked
+**/
+Boolean hasMethod(AbstractParameterAttribute prop, Method method):
+	prop.content.applyfor.methodusefor.contains(method)
+;
+
+/**
+* This method checks if a parameter or an attribute is mandatory flagged in its HTTP method assignment
+* @param prop - the parameter or attribute that will be checked for a method
+* @param method - is the HTTP method for which the prop will be checked
+**/
+Boolean isMandatory(AbstractParameterAttribute prop, Method method):
+	((ApplyFor)prop.content.applyfor.select(e|e.methodusefor == method).first()).metaType.allProperties.name.contains("mandatory")? true : false
+;
+
+/**
+* This method checks if a resource has attributes for a certain method in the current choosen version. 
+* Can be used to check if a ressource method must be generated
+* @param ver - the current choosen API version
+* @param res - is the resource of which the attributes will be checked
+* @param method - is the HTTP method for which the attribute will be checked
+**/
+Boolean areMethodAttributesAvailable(APIVersion ver, Resource res, Method method):
+	let vg = getVersionGroupByVersion(res.versionGroups, ver):
+		!(vg.refAttributes.select(attr| hasMethod(attr, method) ).size == 0)
+;
+
+/**
+* This method checks if a resource has parameters for a certain method in the current choosen version. 
+* Can be used to check if a ressource method must be generated
+* @param ver - the current choosen API version
+* @param res - is the resource of which the attributes will be checked
+* @param method - is the HTTP method for which the parameters will be checked
+**/
+Boolean areMethodParametersAvailable(APIVersion ver, Resource res, Method method):
+	let vg = getVersionGroupByVersion(res.versionGroups, ver):
+		!(vg.refParameter.select(attr| hasMethod(attr, method) ).size == 0)
+;
+
+/**
+* Check if a certain method is allowed for a resource at all. 
+* Therfore it uses the  <tt>areMethodAttributesAvailable</tt> and the <tt>areMethodParametersAvailable</tt>
+* Can be used to check if a ressource method must be generated
+* @param ver - the current choosen API version
+* @param res - is the resource of which the attributes and parameter will be checked
+* @param method - is the HTTP method for which the attributes and parameters will be checked
+**/
+Boolean isCreationAvailable(APIVersion ver, Resource res, Method method):
+	areMethodAttributesAvailable(ver, res, method) || areMethodParametersAvailable(ver, res, method)
+;

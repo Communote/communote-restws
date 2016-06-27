@@ -1,0 +1,12 @@
+plugin.xml_gen
+.settings/
+*/src-gen/
+*/xtend-gen/
+*/target/
+*/bin/
+/.metadata
+de.communardo.restws.feature/de.communardo.restws.feature_1.0.8.SNAPSHOT.jar
+
+com.communote.restws/.antlr-generator-*.jar
+com.communote.restws/model
+

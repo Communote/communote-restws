@@ -1,0 +1,26 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: com.communote.restws.ui
+Bundle-Description: Eclpise editor plugin for working with restws models
+Bundle-Vendor: Communote GmbH
+Bundle-Version: 1.0.8
+Bundle-SymbolicName: com.communote.restws.ui; singleton:=true
+Bundle-ActivationPolicy: lazy
+Require-Bundle: com.communote.restws,
+ com.communote.restws.ide,
+ org.eclipse.xtext.ui,
+ org.eclipse.xtext.ui.shared,
+ org.eclipse.xtext.ui.codetemplates.ui,
+ org.eclipse.ui.editors;bundle-version="3.5.0",
+ org.eclipse.ui.ide;bundle-version="3.5.0",
+ org.eclipse.ui,
+ org.eclipse.compare,
+ org.eclipse.xtext.builder,
+ org.eclipse.xtend.lib;resolution:=optional,
+ org.eclipse.xtext.xbase.lib
+Import-Package: org.apache.log4j
+Bundle-RequiredExecutionEnvironment: JavaSE-1.8
+Export-Package: com.communote.restws.ui.quickfix,
+ com.communote.restws.ui.internal,
+ com.communote.restws.ui.contentassist
+Bundle-Activator: com.communote.restws.ui.internal.RestwsActivator

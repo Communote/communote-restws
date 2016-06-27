@@ -1,0 +1,367 @@
+«IMPORT restWebservice»
+
+«EXTENSION templates::java::server::ServerExtentions»
+«EXTENSION templates::Extensions»
+
+«REM»
+	This is the main method for the parameter class generation for a resource.
+«ENDREM»
+«DEFINE parametertemplate(APIVersion currentVersion, String filePath) FOR Resource»
+	«REM»These are special parameter classes for a resource to be created. 
+		These classes represent the parameter that can be used for a specific HTTP method. 
+		The generation depends on the set of HTTP methods within the meta-model.
+	«ENDREM»
+	«REM»if the resource id attribute has the GET method assigned call the template to generate get GET parameter class«ENDREM»
+	«IF hasMethod(this.resourceId.first(), (Method)Method.getStaticProperty("GET").get())» 
+		«EXPAND parameterclasses ((APIVersion)currentVersion, "Get",(Method)Method.getStaticProperty("GET").get(), filePath) FOR this»
+	«ENDIF»
+	«REM»if the resource id attribute has the DELETE method assigned call the template to generate get DELETE parameter class«ENDREM»
+	«IF hasMethod(this.resourceId.first(), (Method)Method.getStaticProperty("DELETE").get())» 
+		«EXPAND parameterclasses ((APIVersion)currentVersion, "Delete", (Method)Method.getStaticProperty("DELETE").get(), filePath) FOR this»
+	«ENDIF»
+	«REM»if the resource id attribute has the PUT method assigned call the template to generate get PUT parameter class«ENDREM»
+	«IF hasMethod(this.resourceId.first(), (Method)Method.getStaticProperty("PUT").get())» 
+		«EXPAND parameterclasses ((APIVersion)currentVersion, "Edit", (Method)Method.getStaticProperty("PUT").get(), filePath) FOR this»
+	«ENDIF»
+	«REM»if any attribute or parameter of the resource has the POST method assigned call the template to generate get POST parameter class«ENDREM»
+	«IF  isCreationAvailable(currentVersion, this, (Method)Method.getStaticProperty("POST").get())»
+		«EXPAND parameterclasses ((APIVersion)currentVersion, "Create",	(Method)Method.getStaticProperty("POST").get(), filePath)	FOR this»
+	«ENDIF»
+	«REM»if any attribute or parameter of the resource has the LIST method assigned call the template to generate get LIST parameter class«ENDREM»
+	«IF  isCreationAvailable(currentVersion, this, (Method)Method.getStaticProperty("GET_COLLECTION").get())»
+		«EXPAND parameterclasses ((APIVersion)currentVersion, "GetCollection", (Method)Method.getStaticProperty("GET_COLLECTION").get(), filePath) FOR this»
+	«ENDIF»
+«ENDDEFINE»
+
+
+«REM»
+	This template creates a parameter class. In the beginning it just writes out the import statements and the class attributes.
+	Afterwards it will generate the constructor with the parameter parsing content and at the end it generates all the getter and setter methods
+«ENDREM»
+«DEFINE parameterclasses (APIVersion version, String fileprefix, Method method, String filePath) FOR Resource-»
+	«FILE getFilePath(version, fileprefix, "Parameter", this, filePath)»
+		«LET getVersionGroupByVersion(this.versionGroups, version) AS currentVersionGroup-»
+		package «getPackagePath(version, filePath)»;
+		
+		import  «getServletImportPath(version)»RequestListParser;
+		import javax.ws.rs.core.MultivaluedMap;
+		
+		import java.io.IOException;
+		import org.apache.log4j.Logger;
+		
+		import org.codehaus.jackson.JsonParseException;
+		import org.codehaus.jackson.JsonParser.Feature;
+		import org.codehaus.jackson.annotate.JsonAnySetter;
+		import org.codehaus.jackson.annotate.JsonCreator;
+		import org.codehaus.jackson.annotate.JsonIgnore;
+		import org.codehaus.jackson.map.JsonMappingException;
+		import org.codehaus.jackson.map.ObjectMapper;
+		
+		import «getExceptionPath((APIVersion)version).replaceAll("/",".")».RestApiIllegalRequestParameterException;
+		
+			
+		/**
+		* This class it the parameter class for the «this.name» resource. 
+		* It covers all the parameter and attributes of the HTTP «fileprefix.toUpperCase()» method.  
+		**/
+		public class «fileprefix»«this.name»Parameter{
+		
+		private final static Logger LOG = Logger
+            .getLogger(«fileprefix»«this.name»Parameter.class);
+		
+		«REM»Create all the attributes and parameters as class members beginning with the resource id(s)...«ENDREM»
+		«FOREACH this.resourceId  AS resourceid-» 
+			«IF(resourceid == this.resourceId.first() && hasMethod(resourceid, method) ||  resourceid != this.resourceId.first())-»
+				«IF resourceid.content.parameterConstants.isEmpty»
+				/**
+				* «resourceid.content.doc.description»
+				**/
+  				private «EXPAND templates::java::server::ServerCommon::datatypeMapper(version, filePath) FOR resourceid.type-» «resourceid.name.toFirstLower()-»;
+  				«ELSE»
+  				/**
+				* «resourceid.content.doc.description»
+				**/
+  				private E«resourceid.name.toFirstUpper()» «resourceid.name.toFirstLower()»;
+  				«ENDIF»
+			«ENDIF»
+	  	«ENDFOREACH-»
+	  		
+		
+			«REM»... than with the attributes ... «ENDREM»
+			«FOREACH currentVersionGroup.refAttributes  AS attr-»
+				«IF hasMethod(attr, method) && attr != this.resourceId.first()-»
+					«REM»Check if the attribute has constant values because of the datatype mapping«ENDREM»
+					/**
+					 * «attr.content.doc.description»
+					 **/
+					«IF attr.content.parameterConstants.isEmpty»
+						«IF this.subResources.select(sR|sR.name == attr.type.resourcetype.name).size > 0 »
+							private «EXPAND templates::java::server::ServerCommon::datatypeMapper(version, getPackageOfResourceAttribute(filePath, attr)) FOR attr.type-» «attr.name.toFirstLower()»;
+						«ELSE»
+							private «EXPAND templates::java::server::ServerCommon::datatypeMapper(version, attr.type.resourcetype.name.toLowerCase()) FOR attr.type-» «attr.name.toFirstLower()»;
+						«ENDIF»
+					«ELSEIF attr.type.isArray && attr.type.datatype.toString().toLowerCase() == "string"»
+						private java.util.List<E«attr.name.toFirstUpper()»> «attr.name.toFirstLower()»;
+					«ELSE»
+						private E«attr.name.toFirstUpper()» «attr.name.toFirstLower()»;
+					«ENDIF»
+				«ENDIF-»
+			«ENDFOREACH-»
+			«REM»... and finally with the parameters«ENDREM»
+			«FOREACH currentVersionGroup.refParameter  AS param-»
+				«IF hasMethod(param,method )-»
+				«REM»Check if the parameter has constant values because of the datatype mapping«ENDREM»
+				   /**
+					* «param.content.doc.description»
+					**/
+					«IF param.content.parameterConstants.isEmpty »
+						«IF this.subResources.select(sR|sR.name == param.type.resourcetype.name).size > 0 »
+							private «EXPAND templates::java::server::ServerCommon::datatypeMapper(version, getPackageOfResourceParameter(filePath, param)) FOR param.type-» «param.name.toFirstLower()»;
+						«ELSE»
+							private «EXPAND templates::java::server::ServerCommon::datatypeMapper(version, param.type.resourcetype.name.toLowerCase()) FOR param.type-» «param.name.toFirstLower()»;
+						«ENDIF»
+					«ELSEIF param.type.isArray && param.type.datatype.toString().toLowerCase() == "string"»
+						private java.util.List<E«param.name.toFirstUpper()»> «param.name.toFirstLower()»;
+					«ELSE»
+						private E«param.name.toFirstUpper()» «param.name.toFirstLower()»;
+					«ENDIF»
+				«ENDIF-»
+			«ENDFOREACH-»	
+			
+			«REM»Adds code for parsing value map to attributes of parameter class«ENDREM»
+			«EXPAND parse(version, fileprefix, method, currentVersionGroup, filePath) FOR this»
+			
+			«REM»Create getter and setter for (parent) resource ids...«ENDREM»
+			«FOREACH this.resourceId  AS resourceid-»
+		  		«IF(resourceid == this.resourceId.first() && hasMethod(resourceid, method) ||  resourceid != this.resourceId.first())»
+					«EXPAND templates::java::server::ServerCommon::createSetter(version, filePath) FOR resourceid-»
+					«EXPAND templates::java::server::ServerCommon::createGetter(version, filePath) FOR resourceid-»
+		  		«ENDIF»
+		  	«ENDFOREACH-»
+		  	
+		  	«REM»...attributes...«ENDREM»	
+			«FOREACH ((VersionGroup)currentVersionGroup).refAttributes  AS attr-»
+				«IF hasMethod(attr,method ) && attr != this.resourceId.first()-»
+					«IF this.subResources.select(sR|sR.name == attr.type.resourcetype.name).size > 0 »
+						«EXPAND templates::java::server::ServerCommon::createSetter(version, getPackageOfResourceAttribute(filePath, attr)) FOR attr-»
+						«EXPAND templates::java::server::ServerCommon::createGetter(version, getPackageOfResourceAttribute(filePath, attr)) FOR attr-»
+					«ELSE»
+						«EXPAND templates::java::server::ServerCommon::createSetter(version, attr.type.resourcetype.name.toLowerCase()) FOR attr-»
+						«EXPAND templates::java::server::ServerCommon::createGetter(version, attr.type.resourcetype.name.toLowerCase()) FOR attr-»
+					«ENDIF»
+				«ENDIF-»
+			«ENDFOREACH-»
+			«REM»...parameters«ENDREM»
+			«FOREACH ((VersionGroup)currentVersionGroup).refParameter  AS param-»
+				«IF hasMethod(param,method )-»
+					«IF this.subResources.select(sR|sR.name == param.type.resourcetype.name).size > 0 »
+						«EXPAND templates::java::server::ServerCommon::createSetter(version, getPackageOfResourceParameter(filePath, param)) FOR param-»
+						«EXPAND templates::java::server::ServerCommon::createGetter(version, getPackageOfResourceParameter(filePath, param)) FOR param-»
+					«ELSE»
+						«EXPAND templates::java::server::ServerCommon::createSetter(version, param.type.resourcetype.name.toLowerCase()) FOR param-»
+						«EXPAND templates::java::server::ServerCommon::createGetter(version, param.type.resourcetype.name.toLowerCase()) FOR param-»
+					«ENDIF»
+				«ENDIF-»
+			«ENDFOREACH-»
+			
+		«ENDLET»	
+			
+			  /**
+			   * Log unknown properties to loglevel warn.
+			   */
+			  @JsonAnySetter
+			  public void handleUnknownProperties(String key, Object value) {
+			    LOG.warn("Element with key \"" + key + "\" does not exist.");
+			  }
+		
+		}
+	«ENDFILE»
+«ENDDEFINE»
+
+«REM»
+	Writes the consturctor for all parameter classes excepted the DELETE method
+«ENDREM»
+«DEFINE parse(APIVersion version, String fileprefix, Method method, VersionGroup versionGroup, String filePath) FOR Resource»
+	
+   /**
+	* Default Constuctor necessary for json parsing
+	**/
+	@JsonCreator
+	public «fileprefix»«this.name»Parameter(){
+		
+	}
+	
+	«REM»write a different method definition depending if the parameter class handles a list request method (post, list) or a single resource request«ENDREM»
+	«IF (   method == Method.getStaticProperty("GET_COLLECTION").get() || method == Method.getStaticProperty("POST").get() ) -»
+	«REM»skip the resource id of the current resource«ENDREM»
+	/**
+	* This constructor parses all incoming parameter of a request into the class structure
+	* @params valueMap - all the request parameters
+	* @params all ids of the parent resources of the current resource
+	**/
+	@JsonIgnore
+	public «fileprefix»«this.name»Parameter(MultivaluedMap<String, String> valueMap «IF this.resourceId.withoutFirst().size > 0»,«EXPAND getPathParamsAsMethodParams(version,filePath) FOR this.resourceId.withoutFirst()»«ENDIF») throws RestApiIllegalRequestParameterException {
+		«FOREACH this.resourceId.withoutFirst() AS resourceId -»
+			this.«resourceId.name» = «resourceId.name»;
+		«ENDFOREACH»
+	«ELSE»
+	«REM»Write all resource ids to the method definition«ENDREM»
+	/**
+	* This constructor parses all incoming parameter of a request into the class structure
+	* @params valueMap - all the request parameters
+	* @params all ids of the current resource and its parent resources
+	**/
+	@JsonIgnore
+	public «fileprefix»«this.name»Parameter(MultivaluedMap<String, String> valueMap, «EXPAND getPathParamsAsMethodParams(version, filePath) FOR this.resourceId-») throws RestApiIllegalRequestParameterException{
+		«FOREACH this.resourceId AS resourceId -»
+			this.«resourceId.name» = «resourceId.name»;
+		«ENDFOREACH»
+	«ENDIF-»
+	«REM»Do standard parsing of the parameter and assign the values to the members«ENDREM»
+	«EXPAND parseMap(method, this.resourceId.first()) FOR versionGroup»
+	}
+	
+	«REM»Constructor, creating appropriate parameter, based on json representation of the resource«ENDREM»
+		@JsonIgnore
+		«IF (   method == Method.getStaticProperty("GET_COLLECTION").get() || method == Method.getStaticProperty("POST").get() ) -»
+		public «fileprefix»«this.name»Parameter(String representation «IF this.resourceId.withoutFirst().size > 0»,«EXPAND getPathParamsAsMethodParams(version,filePath) FOR this.resourceId.withoutFirst()»«ENDIF») throws JsonParseException, JsonMappingException, IOException {
+			 
+			«IF this.resourceId.withoutFirst().size > 0»
+				«FOREACH this.resourceId.withoutFirst() AS resourceId -»
+					this.«resourceId.name» = «resourceId.name»;
+				«ENDFOREACH»
+			«ENDIF»
+			
+		«ELSE»
+		public «fileprefix»«this.name»Parameter(String representation, «EXPAND getPathParamsAsMethodParams(version, filePath) FOR this.resourceId-») throws JsonParseException, JsonMappingException, IOException {
+			
+			«FOREACH this.resourceId AS resourceId -»
+				this.«resourceId.name» = «resourceId.name»;
+			«ENDFOREACH»
+
+		«ENDIF»
+			if (representation != null && !representation.equals("")) {
+
+
+				ObjectMapper mapper = new ObjectMapper();
+				mapper.configure(Feature.ALLOW_UNQUOTED_CONTROL_CHARS, true);
+				«fileprefix»«this.name»Parameter «fileprefix.toFirstLower()»«this.name»Parameter = mapper.readValue(representation,
+						«fileprefix»«this.name»Parameter.class);
+
+				«FOREACH versionGroup.refAttributes AS attr-»
+					«IF (   method == Method.getStaticProperty("GET_COLLECTION").get() || method == Method.getStaticProperty("POST").get() ) -»
+						«IF this.resourceId.withoutFirst().select(e|e.name == attr.name).size == 0 && hasMethod(attr,method )»
+							«attr.name.toFirstLower()» = «fileprefix.toFirstLower()»«this.name»Parameter.get«attr.name.toFirstUpper()»();
+						«ENDIF»
+					«ELSE»
+						«IF this.resourceId.select(e|e.name == attr.name).size == 0 && hasMethod(attr,method )»
+							«attr.name.toFirstLower()» = «fileprefix.toFirstLower()»«this.name»Parameter.get«attr.name.toFirstUpper()»();
+						«ENDIF»
+					«ENDIF»
+				«ENDFOREACH»
+				
+				«FOREACH versionGroup.refParameter AS parameter-»
+					«IF hasMethod(parameter,method )»
+						«parameter.name.toFirstLower()» = «fileprefix.toFirstLower()»«this.name»Parameter.get«parameter.name.toFirstUpper()»();
+					«ENDIF»
+				«ENDFOREACH»
+				
+
+		}
+	}
+	
+	
+«ENDDEFINE»
+
+
+«REM»
+	This method parses the parameter from the mulivalue map provided with the request 
+«ENDREM»
+«DEFINE parseMap(Method method, AbstractParameterAttribute resourceId) FOR VersionGroup»
+if (valueMap != null && !valueMap.isEmpty()) {
+	«REM»for list requests the resource id can be found in the mulivaluedmap with all the other parameters«ENDREM»
+	«REM» «IF hasMethod( resourceId, (Method) Method.getStaticProperty("GET_COLLECTION").get() ) || hasMethod(resourceId, (Method) Method.getStaticProperty("POST").get())»
+	 	«resourceId.name.toFirstLower()» =
+	 		«IF resourceId.type.resourcetype != null-»RequestListParser.get«resourceId.type.resourcetype.name.toLowerCase().toFirstUpper()»
+	 		«ELSE-»RequestListParser.get«resourceId.type.datatype.toString().toLowerCase().toFirstUpper()»
+	 		«ENDIF-»
+	 		(valueMap.getFirst("«resourceId.name.toFirstLower()»"));
+	 «ENDIF»  «ENDREM»
+	«REM»parse the attributes  from the multivalued map«ENDREM»
+	«REM»only primitive types can be processed this way, in the case of subresources another constructor should be used«ENDREM»
+	«FOREACH this.refAttributes AS attr-»
+		«IF hasMethod(attr,method ) && attr != resourceId && attr.type.resourcetype == null»
+			«IF attr.type.isArray-»
+				 «IF attr.content.parameterConstants.isEmpty»
+				 	«REM»The Restlet - Jax-Rs has a strange behaviour:
+					 	When you call valueMap.get() you need to check if the key exists in otherwise in the case the key does not exist Restlet throws an exception
+				     	But on the other side when you do this checking for a single value that you could retrieve with valueMap.getFirst() the containsKey() check will be always return false
+				 	«ENDREM»
+				 	«REM»«IF attr.type.resourcetype != null-»«ENDREM»
+					«REM»RequestListParser.getArray«attr.type.resourcetype.name.toLowerCase().toFirstUpper()»Resource«ELSE-»«ENDREM»
+				 	«attr.name.toFirstLower()» = RequestListParser.getArray«attr.type.datatype.toString().toLowerCase().toFirstUpper()»(valueMap.containsKey("«attr.name.toLowerCase()»")? valueMap.get("«attr.name.toLowerCase()»") : null, "«attr.name.toLowerCase()»");
+				 «ELSE»
+				 	«attr.name.toFirstLower()» = RequestListParser.convertToEnumList( E«attr.name.toFirstUpper()».class, valueMap.containsKey("«attr.name.toFirstLower()»")? valueMap.get("«attr.name.toFirstLower()»") : null);
+				«ENDIF»
+				«REM»«ENDIF-»«ENDREM»
+			«ELSEIF !attr.content.parameterConstants.isEmpty-»
+				try{
+					«attr.name.toFirstLower()» = E«attr.name.toFirstUpper()».valueOf(valueMap.getFirst("«attr.name.toFirstLower()»"));
+				} catch (NullPointerException npe) {
+					«attr.name.toFirstLower()» = null;
+				} catch (IllegalArgumentException iae) {
+					«attr.name.toFirstLower()» = null;
+				}
+			«ELSE-»
+				«IF attr.type.resourcetype != null-»«attr.name.toFirstLower()» = RequestListParser.get«attr.type.resourcetype.name.toLowerCase().toFirstUpper()»Resource(valueMap.getFirst("«attr.name.toFirstLower()»"));
+				«ELSE-»
+					«REM»If Boolean is NULL then return NULL and not FALSE.«ENDREM»
+					«IF method == Method.getStaticProperty("PUT").get() && attr.type.datatype.toString().toLowerCase() == "boolean"-»  
+						«attr.name.toFirstLower()» = RequestListParser.get«attr.type.datatype.toString().toLowerCase().toFirstUpper()»(valueMap.getFirst("«attr.name.toFirstLower()»"), null);
+					«ELSE-»
+						«attr.name.toFirstLower()» = RequestListParser.get«attr.type.datatype.toString().toLowerCase().toFirstUpper()»(valueMap.getFirst("«attr.name.toFirstLower()»"));
+					«ENDIF-»
+				«ENDIF-»
+			«ENDIF-»
+		«ENDIF-»
+	«ENDFOREACH-»
+	«REM»parse the parameter  from the multivalued map«ENDREM»
+	«FOREACH this.refParameter AS param-»
+		«IF param.type.resourcetype == null && hasMethod(param,method )-»
+			«IF param.type.isArray-»
+				«IF param.type.resourcetype != null-»«param.name.toFirstLower()» = RequestListParser.getArray«param.type.resourcetype.name.toLowerCase().toFirstUpper()»Resource
+				«ELSE-»«param.name.toFirstLower()» = RequestListParser.getArray«param.type.datatype.toString().toLowerCase().toFirstUpper()»
+				«ENDIF-»
+				(valueMap.containsKey("«param.name.toLowerCase()»")? valueMap.get("«param.name.toFirstLower()»") : null, "«param.name.toLowerCase()»");
+			«ELSEIF !param.content.parameterConstants.isEmpty-»
+				try{
+					«param.name.toFirstLower()» = E«param.name.toFirstUpper()».valueOf(valueMap.getFirst("«param.name.toFirstLower()»"));
+				} catch (NullPointerException npe) {
+					«param.name.toFirstLower()» = null;
+				} catch (IllegalArgumentException iae) {
+					«param.name.toFirstLower()» = null;
+				}
+			«ELSE-»
+				«IF param.type.resourcetype != null-»«param.name.toFirstLower()» = RequestListParser.get«param.type.resourcetype.name.toLowerCase().toFirstUpper()»Resource
+				«ELSE-»«param.name.toFirstLower()» = RequestListParser.get«param.type.datatype.toString().toLowerCase().toFirstUpper()»
+				«ENDIF-»
+				(valueMap.getFirst("«param.name.toFirstLower()»"));
+			«ENDIF»
+		«ENDIF-»
+	«ENDFOREACH-»
+	}
+«ENDDEFINE»
+
+«REM»
+	This templates writes all the resource ids as comma separated list for a method definition
+«ENDREM»
+«DEFINE getPathParamsAsMethodParams(APIVersion version, String filePath) FOR List[AbstractParameterAttribute]-»
+	«REM»iterate over all resource ids call a script to get the datatype mapping and concatinate all the resource ids«ENDREM»
+	«FOREACH this AS resourceId SEPARATOR ","-»
+		«IF resourceId.content.parameterConstants.isEmpty-»
+			«EXPAND templates::java::server::ServerCommon::datatypeMapper(version, filePath) FOR resourceId.type-» «resourceId.name-»
+		«ELSE-»
+			E«resourceId.name.toFirstUpper()-» «resourceId.name.toFirstLower()-»
+		«ENDIF-»
+	«ENDFOREACH-»
+«ENDDEFINE»

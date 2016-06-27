@@ -1,0 +1,18 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: com.communote.restws.generator
+Bundle-SymbolicName: com.communote.restws.generator;singleton:=true
+Bundle-Version: 1.0.26
+Bundle-ClassPath: com.communote.restws.generator
+Bundle-Vendor: Communote GmbH
+Require-Bundle: com.communote.restws;bundle-version="1.0.15";visibility:=reexport,
+ org.eclipse.xpand;bundle-version="2.0.0";visibility:=reexport,
+ org.eclipse.xtend;bundle-version="2.0.0";visibility:=reexport,
+ org.eclipse.xtend.typesystem.emf;bundle-version="2.0.0";visibility:=reexport,
+ org.eclipse.xtext;bundle-version="2.9.1";visibility:=reexport,
+ org.eclipse.emf.mwe2.launch;bundle-version="2.8.3";resolution:=optional,
+ org.eclipse.emf.mwe.utils;bundle-version="1.3.13";visibility:=reexport
+Bundle-RequiredExecutionEnvironment: JavaSE-1.7
+Import-Package: org.apache.commons.logging,
+ org.apache.log4j
+Bundle-ActivationPolicy: lazy

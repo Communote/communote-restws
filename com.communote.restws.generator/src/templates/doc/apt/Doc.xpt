@@ -1,0 +1,15 @@
+«IMPORT restWebservice»
+
+«EXTENSION templates::doc::apt::DocExtension»
+«EXTENSION templates::Extensions»
+
+«REM»This template parses a whole webservice for documentation «ENDREM»
+«DEFINE docmain FOR RestWebservice»
+
+	«REM»directly request with json requests«ENDREM»
+	«EXPAND templates::doc::apt::DocResource::docResource FOR this»
+	
+	«REM»used client for requests«ENDREM»
+	«EXPAND templates::doc::apt::DocClient::docClient FOR this»
+	
+«ENDDEFINE»

@@ -1,0 +1,36 @@
+import restWebservice;
+
+extension templates::Extensions;
+
+/**
+* This method provides the basic path, where the documentation should be generated to
+* The version is inculded in this path so the version is needed. e.g. /doc/v1.3.1
+* @params ver - version for the path
+* @return the path as string
+**/
+private getBasePath(APIVersion ver):
+	"/doc/" + ver.name
+;
+
+/**
+* This method provides the total path where the html documentation should be generated to with the file name of the document
+* @params filename - the name of the file
+* @params ext - the file extension
+* @return path to the html file
+**/
+getDocPath( String filename, String ext, String filePath):
+	 filePath + "/" + filename + "." + ext
+;
+
+/**
+*	This method prvides you a APIVersion instance for a string where the string equals the name of the API version
+*	@param ws - a web service with a set of API versions
+*	@param apiversion - a string with the name of an API version of which you want to have the instance
+**/
+getApiVersionFormString(RestWebservice ws,  String apiversion):
+	ws.apiVersions.select(e| ((APIVersion)e).name == apiversion).first()
+;
+
+checkVersionGroupForMethod(VersionGroup currentVersionGroup,  String method):
+	currentVersionGroup.refAttributes.content.applyfor.methodusefor.toString().contains(method) || currentVersionGroup.refParameter.content.applyfor.methodusefor.toString().contains(method)
+;

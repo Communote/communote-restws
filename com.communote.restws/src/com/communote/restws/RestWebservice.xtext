@@ -1,0 +1,135 @@
+grammar com.communote.restws.RestWebservice with org.eclipse.xtext.common.Terminals
+
+generate restWebservice "http://www.communote.com/restws"
+
+RestWebservice:
+    "webservice" name=ID "{"
+    //is a documentation string to give a brief description of the webservice  - MUST -
+    (doc=Documentation)
+    //determines if the PUT and DELETE method should be done by the post method - MUST -
+    (fullRestSupport?="full-rest-support" (";")?)?
+    //are the mime types of how the representation of an resource will be - MUST -
+    "mime-types" "{" mimeTypes+=MimeType ("," mimeTypes+=MimeType)* "}" (";")?
+    //the API versions available for this webservice. Depending on the version the attributes, parameter, filters... will be assigned - MUST -
+    (apiVersions+=APIVersion)+
+    //a group of strings for filtering collections - NOT NEEDED (if not determined: don't generate filter parameter) -   
+    (parameterGroups+=ParameterGroup)*
+    (resources+=Resource)+
+    "}" (";")?;
+
+DataType:
+    (datatype=Types|resourcetype=[Resource]) (isArray?="[]")?;
+
+ApplyFor:
+    UseFor | MandatoryFor;
+
+UseFor:
+    methodusefor=Method;
+
+MandatoryFor:
+    methodusefor=Method mandatory?="!";
+
+MimeType:
+    mime=STRING "{"
+    "extensions" "{" ext+=STRING ("," ext+=STRING)* "}" (";")?
+    "}";
+
+APIVersion:
+    "version" name=ID "{"
+    doc=Documentation
+    "}" (";")?;
+
+Documentation:
+    "doc" description=STRING (";")?;
+
+DocumentationMethod:
+    "doc" docMethod=Method description=STRING (";")?;
+    
+Property:
+    "property" propertyValue=PropertyValues description=STRING (";")?;
+    
+ParameterGroup:
+    "parameter-group" name=ID "{"
+    doc=Documentation
+    (parameterGroupValues+=Parameter)+
+    "}" (";")?;
+
+    /*It is not possible to move the content statement in here, because the in the model you need to define a instance of
+AbstractParameterAttribute. But that would mean you cannot differ between Parameter and Attribute within the Resource*/
+AbstractParameterAttribute:
+    Parameter | Attribute;
+
+    //no inheritance because to reference an rule instance the rule itself must contain the ID rule. Otherwise in the resource there will be a mixture between params and attr
+Parameter:
+    type=DataType name=ID
+    content=ParameterAttributeContent;
+
+Attribute:
+    type=DataType name=ID
+    content=ParameterAttributeContent;
+
+    /*
+The features of a prameter and an attribute are the same. So this part is outsourced. Parameters and Attributes are not in an inheritance hierarchy 
+because this would result that it is not possible to do deal differently with the association to eighter the prameter or the attribute within the resource. 
+*/
+ParameterAttributeContent:
+    "{"
+    doc=Documentation
+    (property=Property)?
+    ("methods" "{" applyfor+=ApplyFor ("," applyfor+=ApplyFor)* "}" (";")?)? //For what HTTP method will this parameter be applied and is it Mandatory, It is done in applyFor to have all methods in one list - better evaluation
+    ("constants" "{" parameterConstants+=ConstantValue ("," parameterConstants+=ConstantValue)* "}" (";")?)?
+    "}" (";")?;
+
+ConstantValue:
+    value=STRING
+    "{" doc=Documentation "}";
+
+/*This feature represents a resource with the references to the other features*/
+Resource:
+//terminal rule  to identify a resource
+    'resource' name=ID "{"
+    //Documentation text
+    doc=Documentation
+    //doc of methods
+    (docMethod+=DocumentationMethod)*
+    (property=Property)?
+    //you can specify parameters but you don't need to 
+    ("parameters" "{" (parameters+=Parameter)* "}")?
+    // you need to specify at least one attribute 
+    "attributes" "{" (attributes+=Attribute)+ "}"
+    //flags a attribute as resource ID
+    "id" resourceId+=[Attribute] (";")?
+    // list of version groups 
+    ("version-groups" "{" versionGroups+=VersionGroup ("," versionGroups+=VersionGroup)* "}" (";")?)?
+    //subresources. so calling this rule again
+    (subResources+=Resource)* "}" (";")?;
+
+    //for adding and removing attributes depending on the api version
+//The ID is needed because otherwise it is not possible to get the refered objects. It will not instanciate new version groups so it will put all references of one type in a single list. TODO Check if it is true
+VersionGroup:
+    name=ID "for" refVersion=[APIVersion] "{" ("parameter-groups" "{" refParameterGroups+=[ParameterGroup] (","
+    refParameterGroups+=[ParameterGroup])* "}" (";")?)? & ("parameters" "{" refParameter+=[Parameter] (","
+    refParameter+=[Parameter])* "}" (";")?)? & "attributes" "{" refAttributes+=[Attribute] (","
+    refAttributes+=[Attribute])* "}" (";")? "}";
+
+/*Represents the HTTP methods*/
+enum Method:
+    GET_COLLECTION="list" |
+    GET="get" |
+    POST="post" |
+    PUT="put" |
+    DELETE="delete";
+
+enum PropertyValues:
+    DUMMY="dummy";
+
+/*Represents all the data types*/
+enum Types:
+    STRING="string" |
+    INTEGER="integer" |
+    LONG="long" |
+    DOUBLE="double" |
+    BYTE="byte" |
+    DATE="date" |
+    BOOLEAN="boolean";
+    

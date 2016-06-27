@@ -1,0 +1,52 @@
+«IMPORT restWebservice»
+
+«EXTENSION templates::ruby::client::ClientExtension»
+
+«REM»This template creates the class with the abstract methods that have to be overwritten«ENDREM»
+«DEFINE skeleton(APIVersion version, List[MimeType] mimeTypes) FOR RestWebservice»
+	«FILE getAppPath(version) + "/abstract_" + this.name.toFirstLower() + "_resource_enquirer.rb"-»
+class Abstract«this.name»ResourceEnquirer
+	
+  «REM»List all the mime types that are available within this web service«ENDREM»
+  #hash map of all available mime types
+  SUPPORTED_MIME_TYPE = Hash[«FOREACH mimeTypes AS mimeType SEPARATOR ","-»"«mimeType.mime-»" => ".«mimeType.ext.first()-»"«ENDFOREACH-»]
+  
+  def get_resource(uri_path, get_parameter, mimetype);raise NoMethodError, "Must be overriden - get_resource"; end
+  def get_resource_collection(uri_path,get_collection_parameter, mimetype);raise NoMethodError, "Must be overriden - get_resource_collection"; end
+  def delete_resource(uri_path,delete_parameter, mimetype);raise NoMethodError, "Must be overriden - delete_resource"; end
+  def create_resource(uri_path,create_parameter, mimetype);raise NoMethodError, "Must be overriden - create_resource"; end
+  def edit_resource(uri_path,get_parameter, mimetype);raise NoMethodError, "Must be overriden - edit_resource"; end
+  def get_base_uri();raise NoMethodError, "Must be overriden - get_base_uri"; end
+  def evaluate_http_status(status_code);raise NoMethodError, "Must be overriden - evaluate_http_status"; end
+end
+	«ENDFILE»
+«REM»Writes the util class to the app path of the configuration classes. This class does the parsing from an array to a string«ENDREM»	
+	«FILE getAppPath(version) + "/util.rb"-»
+class Util
+  #converts an array to a concatinated string. The key is the http parameter for the request. 
+  #A http parameter array will look like key=value1&key=value2&... 
+  def self.to_param_list(array, key)
+    ret = ""
+    array.each do |e| 
+      ret << "#{key}=#{e}&"
+    end
+    return ret[0..ret.size-2]
+  end
+end
+	«ENDFILE»
+	
+	«REM»create the method parameter class. this class is the super class for all parameter classes«ENDREM»
+	«FILE getAppPath(version) + "/method_parameter.rb"-»
+#This class is the superclass for all parameter classes. All these methods will be overwritten by the parameter classes. This is done by the generator
+class MethodParameter
+  #This method provids the path for addressing a resource without the base uri value 
+  def get_uri_path();raise NoMethodError, "Must be overriden - get_uri_path"; end
+  #This method provides a string containing all request parameters with their values.
+  #If a mandatory parameter is not set, the method should raise an ArgumentError  
+  #For a GET/List request this return value has to be added to the end of the address path, for all other request it has to be set to the http body
+  def get_parameter_string();raise NoMethodError, "Must be overriden - get_parameter_string"; end
+  #This method validates the mandatory attributes. It returns true if all the attributes are properly set otherwise false
+  def is_valid_parameter_list();raise NoMethodError, "Must be overriden - is_valid_parameter_list"; end
+end
+	«ENDFILE»
+«ENDDEFINE»

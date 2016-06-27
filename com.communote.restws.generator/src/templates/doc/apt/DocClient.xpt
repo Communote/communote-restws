@@ -1,0 +1,169 @@
+«IMPORT restWebservice»
+
+«EXTENSION templates::doc::apt::DocExtension»
+«EXTENSION templates::Extensions»
+
+«REM»This template parses a whole webservice for documentation «ENDREM»
+«DEFINE docClient FOR RestWebservice»
+    «REM»Store the current version to a variable«ENDREM»
+    «LET getApiVersionFormString(this, (String) GLOBALVAR selectedAPIVersion ) AS currentVersion-»
+  		«FILE getDocPath("index", "apt", "/client/")-»
+
+  The Communote Client for Java provides functionality to authentificate to communote and to access resources. Furthermore he contains java representations of resources.\
+  Here are some important informations to use the Communote Client as an dependency in applications.
+  
+  <Please note that the Communote Client for Java has only development status! So we not guarantee for entire functionality to access the Communote REST API.>
+  
+  If you want to use the Communote Client following constructor parameter are necessary:
+ 
+*--+--+--+
+|| Type || Name || Description |
+*--+--+--+ 
+| String | baseURL | URL of API of system you want to access\ |
+|        |         | (http://.../microblog/global/api/rest/«currentVersion.name») |
+*--+--+--+ 
+| String | username | login name of user who wants to access |
+*--+--+--+ 
+| String | password | password of user |
+*--+--+--+ 
+
+  An overview of all Client methods you can find {{{Overview_of_Communote_Client_Resource_Methods}below}}.
+  
+  		
+{Important Classes}
+
+  Every resource has his own package. For example the topic resource is located in that package:\
+
++--
+com.communote.plugins.api.rest.client.resource.topic;
++-- 
+
+  Subresources are located in subpackages and resources of subresources in subsubpackages an so on. 
+
+  In every resource package you can found following classes. 
+
+* Resource Classes
+  
+  Resource classes represents the result of an request. So every resource class is an deserialized form of the returned GET request.
+  
+  <<For an specific information about the attributes of an returned resource read the attribute documentation part of appropriate resource for GET and LIST ({{{../resources/index.html}Resource Documentation}}).>>
+
+* Parameter Classes
+  
+  Every parameter classes represent an HTTP-Request to create, get, edit, list or delete the appropriate resource.\
+  For the naming of the parameter class the Client used following {convention}:
+
+*--+--+--+
+|| HTTP-Method || Name of Parameter Class || Example for Topic |
+*--+--+--+ 
+| POST | Create...Parameter | CreateTopicParameter |
+*--+--+--+ 
+| PUT | Edit...Parameter | EditTopicParameter
+*--+--+--+ 
+| GET | Get...Parameter | GetTopicParameter |
+*--+--+--+ 
+| LIST | Get...ResourceParameter | GetCollectionTopicParameter |
+*--+--+--+ 
+| DELETE | Delete...Parameter | DeleteTopicParameter |
+*--+--+--+
+
+
+  <Take care that you choose the right parameter class.
+  Some parameter classes have the same name so you must be careful that you have the right class.
+  You can see this in the package path of the parameter class.>
+
++--
+com.communote.plugins.api.rest.client.resource.topic.property;
+com.communote.plugins.api.rest.client.resource.note.property;
++--
+
+  The parameter classes contains all necessary parameters and attributes for the request with the appropriate HTTP-Method.
+  Besides this, every parameter class contain tree important methods:  
+
+*--+--+--+
+|| Method || Return || Description |
+*--+--+--+ 
+| getUriPath() | String | Get the path to resource |
+*--+--+--+ 
+| isValidParameterList() | Boolean | Valid that all manatory parameters / attributes are set |
+*--+--+--+ 
+| getResourceJSONRepresentation() | String | Get the serialize parameter class as json |
+*--+--+--+ 
+
+  <<Please read the appropriate documentation part of {{{../resources/index.html}Resources}}, for an specific information about the attributs an parameters in every parameter class.>>
+  
+  For example you want to know witch parameters or attributes are necessary to create an topic with <<<CreateTopicParameter>>> or you need to know how to use them?
+  
+  So check the reference of topic resource with an HTTP <<<POST>>> ({{{convention}convention table above}}) request.
+
+* Enumeration for Constants
+
+  All java files with an "E" at the beginning and after this any other upper case letter are enumerations. Enumerations are used for constant values of attributes and parameters.
+
+{Overview of Communote Client Resource Methods}
+
+«FOREACH resources.sortBy(e|e.name) AS resource-»
+«EXPAND resourceFunction ((APIVersion)currentVersion,resource.name,"*", resource.name.toLowerCase()) FOR (Resource)resource -»
+«ENDFOREACH-»
+
+  		«ENDFILE»
+  		
+
+
+    «ENDLET»
+«ENDDEFINE»
+
+«REM»
+	This template parses a single resource with its properties, attributes, parameters, and assoziated ressources. 
+«ENDREM»
+«DEFINE resourceFunction(APIVersion version, String functionName, String section, String package) FOR Resource»
+
+«IF(section != "***")»
+
+«section»  «this.name»
+«ELSE»
+  <<«this.name»>>
+«ENDIF»
+
+  <<Methods>>
+
+  <Please read the appropriate documentation part of {{{../resources/index.html}Resources}}, for an specific information about the attributs an parameters in every parameter class.>
+
+«LET getVersionGroupByVersion( this.versionGroups, version) AS cVG-»
+*--+--+--+
+|| Name || Parameter || Return |
+*--+--+--+
+«IF checkVersionGroupForMethod(cVG,"post")»«EXPAND methodFunction( "create" + this.name , "post", "Create", "Long") FOR this-»«ENDIF»«IF checkVersionGroupForMethod(cVG,"put")»«EXPAND methodFunction( "edit" + this.name , "put", "Edit", "Long") FOR this-»«ENDIF»«IF checkVersionGroupForMethod(cVG,"get")»«EXPAND methodFunction( "get" + functionName, "get", "Get", this.name + "Resource" ) FOR this-»«ENDIF»«IF checkVersionGroupForMethod(cVG,"list")»«EXPAND methodFunction( "getCollection" + functionName,"list", "GetCollection", "List\\<" +this.name + "Resource\\>") FOR this-»«ENDIF»«IF checkVersionGroupForMethod(cVG,"delete")»«EXPAND methodFunction( "delete" + this.name , "delete", "Delete", "void") FOR this-»«ENDIF»
+
+  <<Package>>
+  
+  <Informations about packages and contained classes in packages are listed unter {{{Important_Classes}Important Classes}}.>
+  
+  <<<com.communote.plugins.api.rest.client.resource.«package»>>>
+  
+  <<Package - Files>>
+  
+	* «this.name»Resource.java
+	«IF checkVersionGroupForMethod(cVG,"post")»«EXPAND methodList( "Create" ) FOR this»«ENDIF»«IF checkVersionGroupForMethod(cVG,"put")»«EXPAND methodList( "Edit" ) FOR this»«ENDIF»«IF checkVersionGroupForMethod(cVG,"get")»«EXPAND methodList( "Get" ) FOR this»«ENDIF»«IF checkVersionGroupForMethod(cVG,"list")»«EXPAND methodList( "GetCollection" ) FOR this»«ENDIF»«IF checkVersionGroupForMethod(cVG,"delete")»«EXPAND methodList( "Delete" ) FOR this»«ENDIF»
+	«FOREACH cVG.refParameter AS param-»«IF param.content.parameterConstants.size > 0»«EXPAND generateenums FOR param »«ENDIF»«ENDFOREACH-»
+	«FOREACH cVG.refAttributes AS attr -»«IF attr.content.parameterConstants.size > 0»«EXPAND generateenums FOR attr »«ENDIF»«ENDFOREACH-»
+
+«ENDLET»  
+
+«FOREACH this.subResources.sortBy(e|e.name) AS subresource-»
+	«EXPAND resourceFunction( version,  functionName + subresource.name, section + "*", package + "." + subresource.name.toLowerCase()) FOR (Resource)subresource-»
+«ENDFOREACH-»
+«ENDDEFINE»
+
+«DEFINE methodFunction (String functionName, String method, String methodName, String return) FOR Resource»| «functionName» | «methodName»«this.name»Parameter | «return» |
+*--+--+--+
+«ENDDEFINE»
+
+
+«DEFINE methodList (String methodName) FOR Resource»
+	* «methodName»«this.name»Parameter.java
+«ENDDEFINE»
+
+«DEFINE generateenums FOR AbstractParameterAttribute»
+	* E«this.name.toString().toFirstUpper()».java
+«ENDDEFINE»

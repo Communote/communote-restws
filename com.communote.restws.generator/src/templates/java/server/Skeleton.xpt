@@ -1,0 +1,363 @@
+«IMPORT restWebservice»
+
+«EXTENSION templates::java::server::ServerExtentions»
+«EXTENSION templates::Extensions»
+
+«REM»
+	This template writes out all the configuration and helper files 
+«ENDREM»
+«DEFINE skeleton(APIVersion currentVersion) FOR RestWebservice-»
+
+«REM»
+	This section will create a JAX-RS application configuration class.
+«ENDREM»
+	«FILE getAppPath((APIVersion)currentVersion) + "/Abstract" + this.name.toFirstUpper() + "ApplicationConfig.java"-»
+package «getAppPath((APIVersion)currentVersion).replaceAll("/",".")»;
+
+import java.util.HashSet;
+import java.util.Set;
+
+/**
+*	This class it for configuration purposes and must be extended to implement the abstract method. 
+**/
+abstract public class Abstract«this.name.toFirstUpper()»ApplicationConfig extends javax.ws.rs.core.Application {
+	
+	/**
+	* This is an abstract method that must be overwritten. Within this method the assigning between the resources and the handlers taking place.
+	* An assinging example: ResourceHandlerLocator.getInstance().addAssoziation(BlogResource.class, new BlogResourceHandler());
+	**/
+	abstract public void configureResourceHandler();
+
+	public Abstract«this.name.toFirstUpper()»ApplicationConfig() {}
+	
+	/**
+	* This method configures the resources to be available within the web service
+	* @return A set containing all resources
+	**/
+	public Set<Class<?>> getClasses() {
+		Set<Class<?>> resources = new HashSet<Class<?>>();
+		«REM»Iterate over all the resources of the current version...«ENDREM»
+		«LET getApiVersionFormString(this, ((String) GLOBALVAR selectedAPIVersion)) AS currentVersion-»
+			«FOREACH this.resources AS resource-»
+				«IF checkResourceForVersion(currentVersion, resource)»
+					«REM»Call a template that adds the code lines of adding a resource to a java Set«ENDREM»
+					«EXPAND addresourcetemplate((APIVersion)currentVersion, resource.name.toLowerCase())FOR (Resource)resource-»
+				«ENDIF»
+			«ENDFOREACH-»
+		«ENDLET-»
+		return resources;
+    }
+}	
+		«ENDFILE»
+		
+«REM»
+	This part will create a JAX-RS application class.
+«ENDREM»
+	«FILE getAppPath((APIVersion)currentVersion) + "/" + this.name.toFirstUpper() + "JaxRsApplication.java"-»
+package «getAppPath((APIVersion)currentVersion).replaceAll("/",".")»;
+
+import org.restlet.Component;
+import org.restlet.Restlet;
+import org.restlet.Server;
+import org.restlet.data.Protocol;
+import org.restlet.ext.jaxrs.JaxRsApplication;
+
+/**
+* This class is for configuring the JAX-RS application and use it either within a servlet container or a standalone server
+**/
+public class «this.name.toFirstUpper()»JaxRsApplication extends org.restlet.ext.jaxrs.JaxRsApplication {
+
+	/**
+	* This method configures the JAX-RS application. It sets the method tunneling and configures the context. 
+	* Add the end it calls the configuration class to assign the resources and the handler
+	* @param component - an component of the enviroment e.g. SpringComponent
+	* @param appConfig - the configuration class, that extends the Abstract«this.name.toFirstUpper()»ApplicationConfig class
+	**/
+	public «this.name.toFirstUpper()»JaxRsApplication(Restlet restlet, Abstract«this.name.toFirstUpper()»ApplicationConfig appConfig) {
+		super(restlet.getContext().createChildContext());
+		restlet.getContext().createChildContext();
+		«REM»If the full rest support is not set within the  model skip the follwoing code lines«ENDREM»
+		«IF !this.fullRestSupport»
+		this.getTunnelService().setEnabled(true);
+		this.getTunnelService().setMethodParameter("_method");
+		this.getTunnelService().setMethodTunnel(true);
+		«ENDIF»
+		appConfig.configureResourceHandler();
+		this.add(appConfig);
+	}
+	
+	/**
+	* This static method runs a simple standalone server. No configuration is needed
+	* @param port - the port to which the server should listen to
+	* @param appConfig - the configuration class, that extends the Abstract«this.name.toFirstUpper()»AppConfig class 
+	**/
+	public static void standaloneServer(int port, Abstract«this.name.toFirstUpper()»ApplicationConfig appConfig) throws Exception{
+		Component comp = new Component();
+		Server server = comp.getServers().add(Protocol.HTTP, port);
+		JaxRsApplication application = new «this.name.toFirstUpper()»JaxRsApplication(comp, appConfig);
+		comp.getDefaultHost().attach(application);
+		try{
+			comp.start();
+			System.out.println("Server started on port " + server.getPort());
+			System.out.println("Press any key to stop server");
+			System.in.read();
+			System.out.println("Stopping server");
+			comp.stop();
+			System.out.println("Server stopped");
+		}catch (Exception e) {
+			System.err.println("Server could not be started!\n" + e);
+			
+		}
+	}
+	
+}
+	«ENDFILE»
+	
+«REM»
+	This part will create the parser class
+«ENDREM»
+	
+	«FILE getAppPath((APIVersion)currentVersion) + "/" + "RequestListParser.java"-»
+package «getAppPath((APIVersion)currentVersion).replaceAll("/",".")»;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Date;
+«FOREACH resources AS resource-»
+import «getPackagePath((APIVersion)currentVersion,resource.name.toLowerCase())».«resource.name.toFirstUpper()»Resource;
+«ENDFOREACH-»
+
+import «getExceptionPath((APIVersion)currentVersion).replaceAll("/",".")».RestApiIllegalRequestParameterException;
+
+/**
+* This class is a helper class and does the whole parameter parsing
+**/
+public class RequestListParser {
+	«REM»Create a getArray method for all available data types excepted String «ENDREM»
+	«FOREACH Types.allStaticProperties AS prop»
+		«IF prop.name != "STRING" -»
+			«LET prop.name.toLowerCase().toFirstUpper() AS propname-»	
+	
+	/**
+	* Parses a String list to a «propname» array.
+	* @param strList - List with strings
+	* @return array of «propname»
+	**/
+	public static «propname»[] getArray«propname»(List<String> strList, String key) throws RestApiIllegalRequestParameterException{
+		List<«propname»> elements = new ArrayList<«propname»>();
+       	
+        if (strList != null) {
+            for (String item : strList) {
+            	try{
+	                String[] itemElements = item.split(",");
+	                for (int i = 0; i < itemElements.length; i++) {
+					«IF propname == "Integer"-»
+						elements.add(«propname».parseInt(itemElements[i]));
+					«ELSEIF propname == "Date"-»;
+						elements.add(new Date(Long.parseLong(itemElements[i])));
+					«ELSE-»
+						elements.add(«propname».parse«propname»(itemElements[i]));
+					«ENDIF-»
+	                }
+             	}catch(NumberFormatException e){
+		        	throw new RestApiIllegalRequestParameterException(key ,item, null);
+		        }
+            }
+        }
+        return elements.size() != 0 ? elements.toArray(new «propname»[elements.size()]) : null;
+	}
+			«ENDLET-»
+		«ENDIF-»
+	«ENDFOREACH»
+	
+	«FOREACH resources AS resource-»
+	/**
+	* Parses a «resource.name.toFirstUpper()-»Resource list to a «resource.name.toFirstUpper()-»Resource array.
+	* @param value - List with strings
+	* @return array of «resource.name.toFirstUpper()-»Resource
+	**/
+	public static «resource.name.toFirstUpper()-»Resource[] getArray«resource.name.toFirstUpper()-»Resource(List<String> strList){
+		«REM»
+		/*NOT IMPLEMENTED*/
+		
+		«resource.name.toLowerCase().toFirstUpper()-»Resource[] elements = new «resource.name.toLowerCase().toFirstUpper()-»Resource[0];
+		if(strList != null){
+			elements = strList.toArray(elements);
+		}
+		return elements.length != 0 ? elements: null;
+		«ENDREM»
+		return new «resource.name.toFirstUpper()-»Resource[0];
+	}
+	«ENDFOREACH-»
+	
+	/**
+	* Parses a String list to a enum list
+	* @param clazz - Class of the Type
+	* @param strList - List of Strings
+	* @return List of enums
+	**/
+    public static <T extends Enum<?> > List<T> convertToEnumList(Class<T> clazz, List<String> strList){
+        List<T> list = new ArrayList<T>();
+        if( strList != null ){
+	        for( String element : strList ){
+	            list.add(clazz.cast(element));
+	        }
+        }
+        return list.size() != 0 ? list : null;
+    }
+	
+	/**
+	* Parses a String list to a String array.
+	* @param value - List with strings
+	* @return array of String
+	**/
+	public static String[] getArrayString(List<String> strList, String key){
+		String[] elements = new String[0];
+		if(strList != null){
+			elements = strList.toArray(elements);
+		}
+		return elements.length != 0 ? elements: null;
+	}
+	
+	
+	
+	/**
+	* Converts a string value to a Long. Is the value null then a null is returned.
+	* @param value - string value to convert
+	* @return converted Long value or null
+	**/
+	public static Long getLong(String value){
+		return (value != null ? Long.parseLong(value) : null);
+	}
+	
+	/**
+	* Converts a string value to a Double. Is the value null then a null is returned.
+	* @param value - string value to convert
+	* @return converted Double value or null
+	**/
+	public static Double getDouble(String value){
+		return (value != null ? Double.parseDouble(value) : null);
+	}
+	
+    /**
+     * Converts a string value to a Boolean. Is the value null then false is returned.
+     * 
+     * @param value - string value to convert
+     * @return converted Boolean value
+     **/
+    public static Boolean getBoolean(String value) {
+        return getBoolean(value, false);
+    }
+
+    /**
+     * Converts a string value to a Boolean. Is the value null then the fallback parameter is returned.
+     * 
+     * @param value - string value to convert
+     * @param fallback - the fallback if value is null
+     * @return converted Boolean value
+     **/
+    public static Boolean getBoolean(String value, Boolean fallback) {
+        if (value != null) {
+        	return Boolean.parseBoolean(value);
+        } else {
+        	return fallback;
+        }
+    }
+	
+	/**
+	* Converts a string value to a Date. Is the value null then a null is returned.
+	* @param value - string value to convert
+	* @return converted Date value or null
+	**/
+	public static Date getDate(String value){
+		return (value != null ? new Date(Long.parseLong(value)) : null);
+	}
+	
+	/**
+	* Converts a string value to a Integer. Is the value null then a null is returned.
+	* @param value - string value to convert
+	* @return converted Integer value or null
+	**/
+	public static Integer getInteger(String value){
+		return (value != null ? Integer.parseInt(value) : null);
+	}
+	
+	/**
+	* Passed through a string. Is the value null then a null is returned.
+	* @param value - string value to pass through
+	* @return passed through string value
+	**/
+	public static String getString(String value){
+		return (value != null ? value : null);
+	}
+	
+	/**
+	* Converts a string value to a Byte. Is the value null then a null is returned.
+	* @param value - string value to convert
+	* @return converted Byte value or null
+	**/
+	public static Byte getByte(String value){
+		return (value != null ? Byte.parseByte(value) : null);
+	}
+	
+}	
+	«ENDFILE»
+
+«REM»
+	This section will create the resource handler class.
+«ENDREM»
+	«FILE getAppPath((APIVersion)currentVersion) + "/" + "ResourceHandlerLocator.java"-»
+package «getAppPath((APIVersion)currentVersion).replaceAll("/",".")»;
+
+import java.util.HashMap;
+
+/**
+* This is a singleton class that keeps all the resources with the assigned handlers
+**/
+public class ResourceHandlerLocator {
+    private HashMap<Class<?>, Object > handlerAssigns = new HashMap<Class<?>, Object>();
+    private static ResourceHandlerLocator instance = null;
+
+    public static ResourceHandlerLocator getInstance(){
+        if(instance == null){
+            instance = new ResourceHandlerLocator();
+        }
+        return instance;
+    }
+   
+	/**
+	* This method returns a assigned handle by a class
+	* @param resourceClazz - is the class of which you want to have the handler
+	* @return ResourceHandler class
+	**/
+    public Object getResourceHandler(Class<?> resourceClazz){
+        return handlerAssigns.get(resourceClazz);
+    }
+
+	/**
+	* This method does the assigning of the resource classes and the handler
+	* @param resourceClazz - the resource class that should be assigned to a handler
+	* @param resourceHandler - the handler class that should be assigned to a resource
+	**/
+    public void addAssoziation(Class<?> resourceClazz, Object resourceHandler){
+        handlerAssigns.put(resourceClazz, resourceHandler);
+    }
+
+}
+	«ENDFILE»
+
+«ENDDEFINE»
+
+«REM»
+	This template is called for adding a java code line that adds a resource to a java Set. 
+	It uses the given resource and iterates recursivly over all the subresources
+«ENDREM»
+«DEFINE addresourcetemplate(APIVersion currentVersion, String subPackagePath) FOR Resource»
+«IF checkResourceForVersion((APIVersion)currentVersion, this)-»
+	resources.add(«getPackagePath(currentVersion,subPackagePath) + "." + (this).name.toFirstUpper()-»Resource.class);
+«ENDIF»
+«REM»Do the recursiv call over all the subresources«ENDREM»
+«FOREACH this.subResources AS subresource»
+	«EXPAND addresourcetemplate(currentVersion,subPackagePath + "." + subresource.name.toLowerCase()) FOR subresource»
+«ENDFOREACH» 
+«ENDDEFINE»

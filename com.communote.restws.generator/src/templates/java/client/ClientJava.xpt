@@ -1,0 +1,131 @@
+«IMPORT restWebservice»
+
+«EXTENSION templates::java::client::ClientExtension»
+«EXTENSION templates::Extensions»
+
+«REM»
+This part evaluates the whole RestWebservice and calls some other define blocks to generate specific output depending on the concerns
+Generation steps:
+	- calling the skeleton block to generate static code without any bigger evaluation of model nodes
+	- Iteration over all the resources, check if the resource exists in the current selected version and calls a define block for evaluation of a resource 
+«ENDREM»
+«DEFINE clientjavamain FOR RestWebservice-»
+	«REM»Get the API version object from the version string choosen in the workflow file«ENDREM»
+	«LET getApiVersionFormString( this, (String) GLOBALVAR selectedAPIVersion ) AS version-»
+		«REM»Calls the template for generate the static output files«ENDREM»
+		«EXPAND templates::java::client::ClientJavaSkeleton::skeleton(version, this.mimeTypes, this.fullRestSupport) FOR this»
+		
+		«EXPAND templates::java::client::ClientUtil::util(version) FOR this»
+		«REM»Iterate over all the resources of the webservice...«ENDREM»
+		«FOREACH this.resources AS resource»
+			«REM»...and check if the resource is included within the current selected API version«ENDREM»
+			«IF checkResourceForVersion(version, resource)»
+				«REM»Call the define block for evaluating a single resource. Hand over the current API version object and the resource name within the URI path«ENDREM»
+				«IF resource.name.toFirstLower().endsWith("y") »
+				«EXPAND resourcetemplate(version, this.fullRestSupport, resource.name.toLowerCase(),resource.name.toFirstLower()+"ies") FOR resource»
+				«ELSE»
+				«EXPAND resourcetemplate(version, this.fullRestSupport, resource.name.toLowerCase(),resource.name.toFirstLower()+"s") FOR resource»
+				«ENDIF»
+			«ENDIF»
+		«ENDFOREACH»
+	«ENDLET»
+«ENDDEFINE»
+
+«REM»
+This template block evaluates a single resource and calls different other template blocks for output generation seppareted by concerns
+Generation steps:
+	- calls the block for a regular single resource representation on the client side
+	- calls the template for the parameter classes generation
+	- makes recursiv calls for sub resources
+	@param version - current API version object is needed for the version check and the file path
+	@param path - is the path of the resource (collection) within the URI the plural "s" is already added to this value
+«ENDREM»
+«DEFINE resourcetemplate(APIVersion version, Boolean fullRestSupport, String filePath, String uriPath) FOR Resource»
+	«REM»Calls the template for the generation of the resource file«ENDREM» 
+	«EXPAND singleresource(version, filePath) FOR this»
+	«REM»Calls the template for the generation of the parameter files that are needed for the request«ENDREM» 
+	«EXPAND templates::java::client::ClientParameter::parametertemplate(version, fullRestSupport, filePath, uriPath) FOR this»
+	«REM»Iterates over all the subresources containing in a resource and calls this template block recursivly«ENDREM» 
+	«FOREACH this.subResources AS subresource»
+		«REM»Check that the subresource is contained in the current version«ENDREM»
+		«IF checkResourceForVersion(version, subresource)»
+			«REM»Makes the recursiv call and defines the path for addressing the (sub)resource«ENDREM»
+			«IF subresource.name.toFirstLower().endsWith("y") »
+			«EXPAND resourcetemplate(version, fullRestSupport, filePath + "/" + subresource.name.toLowerCase(), uriPath + "/\" + " + this.resourceId.first().name + " + \"/"+subresource.name.toFirstLower().subString(0,subresource.name.length-1) +"ies") FOR subresource»
+			«ELSE»
+			«EXPAND resourcetemplate(version, fullRestSupport, filePath + "/" + subresource.name.toLowerCase(), uriPath + "/\" + " + this.resourceId.first().name + " + \"/"+subresource.name.toFirstLower()+"s") FOR subresource»
+			«ENDIF»
+		«ENDIF»
+	«ENDFOREACH»
+«ENDDEFINE»
+
+«REM»
+This template block generates a file to represent a resource on the client side
+Generation steps:
+	- creates a resource file with a file name in this notation <resource_name>_resource.rb
+	- Iteration over all the refered attributes and calls the template for the attribute evaluation
+	- Iteration over all the refered parameters and calls the template for the parameter evaluation 
+	@param version - current API version object is needed for the version check and the file path
+«ENDREM»
+«DEFINE singleresource(APIVersion version, String filePath) FOR Resource»
+	«REM»Generate the file on the file path that is delivered with the getFilePath extension«ENDREM»
+	«FILE getFilePath(version, "", "Resource", this, filePath)-»
+package «getPackagePath((APIVersion)version,filePath)»;
+public class «this.name»Resource { «REM»Class definition«ENDREM»
+	  «REM»get all the attributes and parameters that are linked in the current selected API version«ENDREM»
+	  «LET getVersionGroupByVersion(this.versionGroups, version) AS versionGroup-» 
+	  	«FOREACH versionGroup.refAttributes AS attr-»
+	  		«IF attr.content.parameterConstants.isEmpty-»
+				«IF this.subResources.select(sR|sR.name == attr.type.resourcetype.name).size > 0 »
+					private «EXPAND templates::java::client::ClientCommon::datatypeMapper(version, getPackageOfResourceAttribute(filePath, attr)) FOR attr.type» «attr.name.toFirstLower()»; «REM»create class attributes for the linked attributes«ENDREM»
+				«ELSE»
+					private «EXPAND templates::java::client::ClientCommon::datatypeMapper(version, attr.type.resourcetype.name.toLowerCase()) FOR attr.type» «attr.name.toFirstLower()»; «REM»create class attributes for the linked attributes«ENDREM»
+				«ENDIF»
+  			«ELSEIF attr.type.isArray && attr.type.datatype.toString().toLowerCase() == "string"»
+				private java.util.List<E«attr.name.toFirstUpper()»> «attr.name.toFirstLower()»;
+  			«ELSE»
+  				private E«attr.name.toFirstUpper()-» «attr.name.toFirstLower()-»;
+  			«ENDIF»
+  			«EXPAND generateenums(version, filePath) FOR attr» «REM»generate enum file for possible enumerations that can be used as value for this attribute«ENDREM»
+	  	«ENDFOREACH-»
+	  	«REM»Iterates over the linked parameter list to generate enum classes for a specified parameter.
+	  		 No class attributes will be created because parameter are just for server evaluation purposes«ENDREM»
+	  	«FOREACH versionGroup.refParameter AS param-»
+	  		«EXPAND generateenums(version, filePath) FOR param»
+	  	«ENDFOREACH-»
+	  	«FOREACH versionGroup.refAttributes AS attr-»
+			«IF this.subResources.select(sR|sR.name == attr.type.resourcetype.name).size > 0 »
+				«EXPAND templates::java::client::ClientCommon::createGetter(version, getPackageOfResourceAttribute(filePath, attr)) FOR attr» «REM»generate enum file for possible enumerations that can be used as value for this attribute«ENDREM»
+  				«EXPAND templates::java::client::ClientCommon::createSetter(version, getPackageOfResourceAttribute(filePath, attr)) FOR attr» «REM»generate enum file for possible enumerations that can be used as value for this attribute«ENDREM»
+			«ELSE»
+				«EXPAND templates::java::client::ClientCommon::createGetter(version, attr.type.resourcetype.name.toLowerCase()) FOR attr» «REM»generate enum file for possible enumerations that can be used as value for this attribute«ENDREM»
+  				«EXPAND templates::java::client::ClientCommon::createSetter(version, attr.type.resourcetype.name.toLowerCase()) FOR attr» «REM»generate enum file for possible enumerations that can be used as value for this attribute«ENDREM»
+			«ENDIF»
+	  	«ENDFOREACH-»
+	  «ENDLET-»
+}
+	«ENDFILE»
+«ENDDEFINE»
+
+«REM»
+This template block generates a file for an enum class which belongs to an attribute or parameter
+Generation steps:
+	- create a file for the enum class
+	- put in all the constant values as class attributes
+	@param version - current API version object is needed for the version check and the file path
+	@param resource - is the resource instance in which the attribute/parameter constant is includes. This is needed for the file path
+«ENDREM»
+«DEFINE generateenums(APIVersion version, String filePath) FOR AbstractParameterAttribute»
+	«REM»check if a constant value exists«ENDREM»
+	«IF this.content.parameterConstants.size > 0»
+		«REM»create a file with the file name notation: enum_<abstractParameterAttribute_name>«ENDREM»
+		«FILE getEnumFilePath(version, "E", this.name.toString().toFirstUpper(), filePath)»
+			package «getPackagePath((APIVersion)version, filePath)»;
+			public enum E«this.name.toFirstUpper()»{
+			«FOREACH this.content.parameterConstants AS const SEPARATOR ","»
+				«const.value.toUpperCase()»
+			«ENDFOREACH»
+			}
+		«ENDFILE»
+	«ENDIF»
+«ENDDEFINE»

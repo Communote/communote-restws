@@ -1,0 +1,58 @@
+«IMPORT restWebservice»
+
+«EXTENSION templates::java::server::ServerExtentions»
+«EXTENSION templates::Extensions»
+
+«REM»
+	Is the entry point for the server code generation. It takes the whole Webservice instance and starts iterating through it.
+«ENDREM»
+«DEFINE servermain FOR RestWebservice-»
+	«REM» define the variable currentVersion from the global variable in the workflow file and the versions defined in the model«ENDREM»
+	«LET getApiVersionFormString( this, (String) GLOBALVAR selectedAPIVersion ) AS currentVersion-»
+		«REM»Call the template for generating the fixed code like confoguration and parser classes«ENDREM»
+		«EXPAND templates::java::server::Skeleton::skeleton((APIVersion)currentVersion) FOR this»
+		«REM»Call the template for generating the fixed code like confoguration and parser classes«ENDREM»
+		«EXPAND templates::java::server::ServerException::exception((APIVersion)currentVersion) FOR this»
+		«REM»define a variable mimeType«ENDREM»
+		«LET this.mimeTypes AS mimeTypes »
+			«REM»iterate over all defined resources«ENDREM»
+			«FOREACH resources AS resource»
+				«REM»Check if the resource has a version group for the current selected version«ENDREM»
+				«IF checkResourceForVersion(currentVersion, resource)»
+					«REM»if a version group exists start generating the resource and the parameter files «ENDREM»
+					«IF resource.name.toFirstLower().endsWith("y") »
+					«EXPAND resourcetemplate((APIVersion)currentVersion, mimeTypes, resource.name.toFirstLower().subString(0,resource.name.length-1)+"ies", resource.name.toLowerCase() ) FOR (Resource)resource»
+					«ELSE»
+					«EXPAND resourcetemplate((APIVersion)currentVersion, mimeTypes, resource.name.toFirstLower()+"s", resource.name.toLowerCase() ) FOR (Resource)resource»
+					«ENDIF»
+				«ENDIF»
+			«ENDFOREACH»
+		«ENDLET»
+	«ENDLET»
+«ENDDEFINE»
+
+«REM»
+	This method initiates the generation of the resource files and the parameter files for a resource instance.
+	It takes the current version, the list of supported mime types for the annotation generation and an address uri path of the first ressource e.g. "blogs"
+«ENDREM»
+«DEFINE resourcetemplate(APIVersion currentVersion, List[MimeType] mimeTypes, String parentPath, String filePath) FOR Resource»
+	«REM»calls the template to generate the resource class file«ENDREM»
+	«EXPAND templates::java::server::ServerResource::singleresource (currentVersion,  mimeTypes, parentPath, filePath) FOR this»
+	«REM»calls the template to generate all the parameter class files«ENDREM»
+	«EXPAND templates::java::server::ServerParameter::parametertemplate(currentVersion, filePath) FOR this»
+	«REM»iterate over all the resources contained in the current resource«ENDREM»
+	«FOREACH subResources AS subresource»
+		«REM»if the current subressource contains a version group of the current version...«ENDREM»
+		«IF checkResourceForVersion(currentVersion, subresource)»
+			«REM»...call this template (recursiv) again. 
+			Thake care to attach the resource id of the parent resource and the uri address path of the current sub resource to the given parentPath
+			e.g. parentPath/<parentResourceId>/<sub resource name>s - blogs/3/notes
+			«ENDREM»
+			«IF subresource.name.toFirstLower().endsWith("y") »
+			«EXPAND resourcetemplate((APIVersion)currentVersion, mimeTypes, parentPath + "/{"+this.resourceId.first().name + "}/" + subresource.name.toFirstLower().subString(0,subresource.name.length-1) +"ies", filePath + "/" + subresource.name.toLowerCase() ) FOR subresource»
+			«ELSE»
+			«EXPAND resourcetemplate((APIVersion)currentVersion, mimeTypes, parentPath + "/{"+this.resourceId.first().name + "}/" + subresource.name.toFirstLower()+"s", filePath + "/" + subresource.name.toLowerCase() ) FOR subresource»
+			«ENDIF»
+		«ENDIF»
+	«ENDFOREACH»
+«ENDDEFINE»

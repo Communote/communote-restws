@@ -1,0 +1,28 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: com.communote.restws
+Bundle-Vendor: Communote GmbH
+Bundle-Version: 1.0.15
+Bundle-SymbolicName: com.communote.restws; singleton:=true
+Bundle-ActivationPolicy: lazy
+Require-Bundle: org.eclipse.xtext;bundle-version="2.9.1",
+ org.eclipse.equinox.common;bundle-version="3.5.0",
+ org.eclipse.emf.common;bundle-version="2.6.0",
+ org.eclipse.emf.ecore;bundle-version="2.6.1",
+ org.antlr.runtime;bundle-version="3.2",
+ org.eclipse.xtext.util;bundle-version="2.9.1",
+ org.eclipse.xtext.xbase.lib;bundle-version="2.9.1",
+ org.eclipse.xtend.lib;bundle-version="2.9.1"
+Bundle-RequiredExecutionEnvironment: JavaSE-1.8
+Export-Package: com.communote.restws,
+ com.communote.restws.validation,
+ com.communote.restws.services,
+ com.communote.restws.scoping,
+ com.communote.restws.restWebservice.util,
+ com.communote.restws.serializer,
+ com.communote.restws.restWebservice,
+ com.communote.restws.generator,
+ com.communote.restws.parser.antlr,
+ com.communote.restws.restWebservice.impl,
+ com.communote.restws.parser.antlr.internal
+Import-Package: org.apache.log4j

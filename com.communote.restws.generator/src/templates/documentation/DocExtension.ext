@@ -1,0 +1,86 @@
+import restWebservice;
+
+extension templates::Extensions;
+
+/**
+* This method provides the basic path, where the documentation should be generated to
+* The version is inculded in this path so the version is needed. e.g. /doc/v1.3.1
+* @params ver - version for the path
+* @return the path as string
+**/
+private getBasePath(APIVersion ver):
+	"/doc/" + ver.name
+;
+
+/**
+* This method provides the total path where the html documentation should be generated to with the file name of the document e.g. /doc/v1.3.1/html/index.html
+* @params ver - the current selected version
+* @params filename - the name of the file
+* @params ext - the file extension
+* @return path to the html file
+**/
+getDocPath(APIVersion ver, String filename, String ext, String filePath):
+	 (filePath != null) ? getBasePath(ver) + "/html/" + filePath + "/" + filename + "." + ext : getBasePath(ver) + "/html/" + filename + "." + ext
+;
+/**
+*@return example base url.
+*/
+getExampleBaseUrl():
+	if(GLOBALVAR exampleBaseUrl == null) then
+		"http://www.example.com"
+	else
+		(String)GLOBALVAR exampleBaseUrl
+;
+
+/**
+* This method provides the total path where the css for documentation should be generated to with the file name of the document e.g. /doc/v1.3.1/css/main.css
+* @params ver - the current selected version
+* @params filename - the name of the file
+* @params ext - the file extension
+* @return path to the css file
+**/
+getCSSFullPath(APIVersion ver, String filename, String extenstion):
+	getBasePath(ver) + "/css/" + filename + "." + extenstion
+;
+
+/**
+* Returns a relativ path to a css file e.g. ../css/main.css
+* @params ver - the current selected version
+* @params filename - the name of the file
+* @params ext - the file extension
+* @return relativ path to the html file
+**/
+getCSSRefPath(APIVersion ver, String filename, String extenstion):
+	"../css/" + filename + "." + extenstion
+;
+
+/**
+* This method provids an HTML formatted string list with strings that links to each resource.
+* @params ver - current seleced version
+* @params root - the highest resource in the chain of resources
+* @params path - the address to the current resource
+* @return List with strings that represent a HTML link to other resources
+**/
+List[String] getResourceBreadcrumbs(APIVersion ver, Resource root, String path, String filePath):
+	root.subResources.isEmpty == true ? //see if there are any sub resources within the resource...
+		path :	//...if not just return the current path otherwise
+		root.subResources.collect(e|  //iterate over all sub resources...
+			//...and check if the sub resource has elements in the specified API version
+			//...if there is at least one sub resource in the current API version so make a recursiv call to get the underlaying sub resources
+			if( checkResourceForVersion(ver, e)) then
+				getResourceBreadcrumbs( ver, ((Resource)e), path + "<label>&rarr;</label><label>" + "<a href=" + filePath + "/" +((Resource)e).name.toLowerCase() + "/" + ((Resource)e).name.toLowerCase() + ".html target=content>" +  ((Resource)e).name.toFirstUpper() + "</a></label>", filePath + "/" +((Resource)e).name.toLowerCase())
+		 	else
+		 		path
+		)	
+;
+
+/**
+* This method provids an HTML formatted string links to each resource. This is used for the HTML navigation.
+* @params ver - current seleced version
+* @params root - the highest resource in the chain of resources
+* @params path - the address to the current resource
+* @return List with strings that represent a HTML link to other resources
+**/
+getFormattedResourceBreadcrumbs(APIVersion ver, Resource root, String path):
+	getResourceBreadcrumbs(ver, root, path, root.name.toLowerCase()).toString().replaceAll("\\[","").replaceAll("\\]","").replaceAll(",","<br />")
+;

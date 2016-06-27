@@ -1,0 +1,242 @@
+«IMPORT restWebservice»
+
+«EXTENSION templates::doc::apt::DocExtension»
+«EXTENSION templates::Extensions»
+
+«REM»This template parses a whole webservice for documentation «ENDREM»
+«DEFINE docResource FOR RestWebservice»
+    «REM»Store the current version to a variable«ENDREM»
+    «LET getApiVersionFormString(this, (String) GLOBALVAR selectedAPIVersion ) AS currentVersion-»
+  		«FILE getDocPath("usage", "apt", "/resources/")-»
+
+  This is the Communote REST API for the communote microblogging system. The API provides a resources for the components of communote (e.g. Topics, Notes). An overview of all resources you can found under {{{../resources/overview.html}Available Resource}}.
+  
+  We recommend to use the Content-Type <<<application/json;charset=UTF-8>>> for request. Please read the section {{Tunneling}} before you start an request. (<Thats necessary because there is a distinctive different for using requests with HTTP-Method PUT and DELETE.>)
+ 
+  If the request was succeed, you get the following response format:
+
++--
+"status": "OK"
+// returned resource as json or resources as json-array
+"result": ...
+// only if you request with a resource with HTTP-Methode LIST
+"metaData":  
+{
+	// number of all found elements
+	"numberOfElements": "45" 
+	// there are more elements after the 
+	// choosen offset and maxCount  
+	"moreElementsAvailable": "true"  
+}
++--
+
+  If the request fails, you get the following error response format:
+  
++--
+"status": "ERROR"
+
+// general error message
+"message": "general message" 
+
+// only if you request with a resource with HTTP-Methode LIST
+"errors":  
+{
+	// mentioned incorrect element 
+	"cause": "element"  
+	// specific error message for this incorrect element
+	"message": "element is incorrect" 
+}
++--
+
+  As Response you get Content-Type <<<application/json>>> or Content-Type <<<text/html>>>. Content-Type <<<text/html>>> gives you an html-container who contain a global javascript variable with the result. The table below gives you an explanation for using extensions.
+
+*--+--+
+|| URL-Extension || Response Content-Type |
+*--+--+
+| <<<.../Resource/ID>>> | application/json;charset=UTF-8 |
+*--+--+
+| <<<.../Resource/ID.json>>> | application/json;charset=UTF-8 |
+*--+--+
+| <<<.../Resource/ID.html>>> | text/html;charset=UTF-8 |
+*--+--+
+
+{Tunneling}
+  
+  Some servers or proxies don't allow the use of other HTTP methods than GET and POST, also many browsers only support GET and POST. To circumvent this problem it is possible to use a technique called <<tunneling>>.\
+  Instead of sending the request using the intended method, for instance PUT, the request will be send as POST and the intended method will be set as GET parameter <<<_method>>>.\
+  Please refer to the servers documentation to find out, if you have to use tunneling for your requests. This documentation was generated with tunneling enabled.
+
+* Usage of HTTP-Methods
+
+*--+--+--+
+|| Method || Tunneling Method || Tunneling Url |
+*--+--+--+ 
+| POST | POST | <<<.../Resource/>>> |
+*--+--+--+ 
+| PUT | POST | <<<.../Resource/ID?_method=PUT>>> |
+*--+--+--+ 
+| GET | GET | <<<.../Resource/ID>>> |
+*--+--+--+ 
+| LIST | GET | <<<.../Resource/>>> |
+*--+--+--+ 
+| DELETE | POST | <<<.../Resource/ID?_method=DELETE>>> |
+*--+--+--+
+
+		«ENDFILE»
+		
+		«FILE getDocPath("overview", "apt", "/resources/")-»
+			«FOREACH resources.sortBy(e|e.name)  AS resource-»
+				«EXPAND resourceList (resource, resource, "      ", ".html") FOR (Resource)resource -»
+			«ENDFOREACH-»
+		«ENDFILE»
+
+		«FOREACH resources.sortBy(e|e.name) AS resource-»
+			«FILE getDocPath(resource.name.toLowerCase(), "apt", "/resources/")-»
+				«EXPAND resourceTemplate ((APIVersion)currentVersion, "", resource.name.toFirstLower() + "s") FOR (Resource)resource -»
+			«ENDFILE»
+		«ENDFOREACH-»
+    «ENDLET»
+«ENDDEFINE»
+
+«REM»
+	This template parses a single resource with its properties, attributes, parameters, and assoziated ressources. 
+«ENDREM»
+«DEFINE resourceTemplate (APIVersion version, String section, String url) FOR Resource»
+«REM»Get the path to the resource documentation files an create a single file for each resource«ENDREM»
+«IF(section.length == 0)»
+
+Overview
+
+«EXPAND resourceList ( this, this, "      ", "") FOR this -»
+
+		[]
+		
+Resources
+		
+* {«this.name-» Resource}
+	«ELSE»
+«section»* {«this.name-» Resource}
+	«ENDIF»
+
+  «this.doc.description-»
+  
+  «REM» HTTP methods with its description, attributes and parameters «ENDREM»
+  «LET getVersionGroupByVersion( this.versionGroups, version) AS currentVersionGroup-»
+  
+  <<Available HTTP-Methods for «this.name-» Resource>>
+  
+  		«EXPAND methodLink (currentVersionGroup, "post") FOR this»
+	    «EXPAND methodLink (currentVersionGroup, "put") FOR this»
+	    «EXPAND methodLink (currentVersionGroup, "get") FOR this»
+	    «EXPAND methodLink (currentVersionGroup, "list") FOR this»
+  		«EXPAND methodLink (currentVersionGroup, "delete") FOR this»
+
+		[]
+
+    	«EXPAND methodTemplate (currentVersionGroup, "post", url) FOR this»
+    	«EXPAND methodTemplate (currentVersionGroup,"put", url) FOR this»
+    	«EXPAND methodTemplate (currentVersionGroup,"get", url) FOR this»
+    	«EXPAND methodTemplate (currentVersionGroup,"list", url) FOR this»
+   		«EXPAND methodTemplate (currentVersionGroup,"delete", url) FOR this»
+	«ENDLET»
+	«FOREACH this.subResources.sortBy(e|e.name) AS subresource-»
+		«EXPAND resourceTemplate ( version, section + "*", url + "/ID/" + subresource.name.toFirstLower() + "s" ) FOR (Resource)subresource-»
+	«ENDFOREACH-»
+«ENDDEFINE»
+
+«REM»
+    Overview of Resources
+«ENDREM»
+«DEFINE resourceList (Resource parentResource, Resource currentResource, String seperator, String extention) FOR Resource»
+«IF(extention.length > 0)»
+«seperator»* {{{../resources/«parentResource.name.toLowerCase()»«extention»#«currentResource.name»_Resource}«currentResource.name» Resource}}
+«ELSE»
+«seperator»* {{{«currentResource.name»_Resource}«currentResource.name» Resource}}
+«ENDIF»
+
+	«FOREACH this.subResources.sortBy(e|e.name) AS subresource-»
+		«IF(extention.length > 0)»
+			«EXPAND resourceList ( parentResource, subresource, seperator + "      ", extention) FOR (Resource)subresource -»
+		«ELSE»
+			«EXPAND resourceList ( subresource, subresource, seperator + "      ", extention) FOR (Resource)subresource -»
+		«ENDIF»
+	«ENDFOREACH-»
+«ENDDEFINE»
+
+«REM»
+    This template has the inner table structure of the paramater and attribute tables
+    | data type  | attribute name and description   | http methods |
+«ENDREM»
+«DEFINE methodTemplate (VersionGroup currentVersionGroup, String method, String url) FOR Resource»
+	«IF currentVersionGroup.refAttributes.content.applyfor.methodusefor.toString().contains(method) || currentVersionGroup.refParameter.content.applyfor.methodusefor.toString().contains(method)-»
+=====================
+
+  <<{«method.toUpperCase()» - «this.name» Resource}>>
+  
+		«REM» Add HTTP method specific documentation, if available «ENDREM»
+		«FOREACH docMethod AS docm-»
+		    «IF docm.docMethod.toString().matches(method)-»
+  «docm.description»
+           		«IF !method.toLowerCase().matches("put") && !method.toLowerCase().matches("delete") »
+  <Please notice the documentation for {{{../resources/usage.html#Tunneling}Resources Tunneling}}, if you encounter any problems invoking «method» requests on your server.>
+           		«ENDIF»
+	    	«ENDIF»
+		«ENDFOREACH»
+
+		
+  <<«method.toUpperCase()» - Url>>
+  
+  <<<.../«IF method.toUpperCase() == "POST" »«url»/«ELSEIF method.toUpperCase() == "PUT" »«url»/ID?_method=PUT«ELSEIF method.toUpperCase() == "GET" »«url»/ID«ELSEIF method.toUpperCase() == "LIST" »«url»/«ELSEIF method.toUpperCase() == "DELETE" »«url»/ID?_method=DELETE«ENDIF»>>>
+		
+		«IF currentVersionGroup.refParameter.content.applyfor.methodusefor.toString().contains(method)-»
+  <<«method.toUpperCase()» - Parameters>>
+
+  Parameters are generally used to filter the result and are not part of the result set.
+
+*--+--+--+
+|| Type || Name || Description |
+*--+--+--+
+	        «FOREACH currentVersionGroup.refParameter AS parameter-»«IF parameter.content.applyfor.methodusefor.toString().contains(method) && !checkResourceForDummyParameterAttribute(parameter)»«IF ((AbstractParameterAttribute)parameter).content.parameterConstants.isEmpty »«EXPAND paramAttrTemplate (method) FOR (AbstractParameterAttribute)parameter -»«ELSE»«EXPAND paramAttrTemplateForConstants (method) FOR (AbstractParameterAttribute)parameter -»«ENDIF»«ENDIF»«ENDFOREACH-»    
+	    «ENDIF-»
+		
+		
+	    «IF currentVersionGroup.refAttributes.content.applyfor.methodusefor.toString().contains(method)-»
+	    
+  <<«method.toUpperCase()» - Attributes>>
+
+  Attributes are part of the entity send or requested.
+
+*--+--+--+
+|| Type || Name || Description |
+*--+--+--+
+	        «FOREACH currentVersionGroup.refAttributes.sortBy(e|e.name) AS attribute-»«IF attribute.content.applyfor.methodusefor.toString().contains(method) && !checkResourceForDummyParameterAttribute(attribute)»«IF ((AbstractParameterAttribute)attribute).content.parameterConstants.isEmpty »«EXPAND paramAttrTemplate (method) FOR (AbstractParameterAttribute)attribute -»«ELSE»«EXPAND paramAttrTemplateForConstants (method) FOR (AbstractParameterAttribute)attribute -»«ENDIF»«ENDIF»«ENDFOREACH-»  
+	    «ENDIF-»
+	
+
+	«ENDIF»
+«ENDDEFINE»
+
+«REM»
+    This template has the inner table structure of the paramater and attribute tables
+    | Type | Name | Description 
+«ENDREM»    
+«DEFINE paramAttrTemplate (String method) FOR AbstractParameterAttribute-»
+«LET (AbstractParameterAttribute)this AS APA -»| «IF((DataType)APA.type).resourcetype != null-»«((DataType)APA.type).resourcetype.name-»«IF((DataType)APA.type).isArray-»[]«ENDIF-»«ELSE-»«((DataType)APA.type).datatype-»«IF((DataType)APA.type).isArray-»[]«ENDIF-»«ENDIF-» | «IF(APA.isMandatory((Method)Method.getStaticProperty(method.toUpperCase()).get()))»<<«APA.name»>> <(mandatory)>«ELSE»«APA.name»«ENDIF» | «((AbstractParameterAttribute)this).content.doc.description-»|«ENDLET» 
+*--+--+--+
+«ENDDEFINE»
+
+«REM»
+    This template has the inner table structure of the paramater and attribute tables
+    | Type | Name | Description 
+«ENDREM»    
+«DEFINE paramAttrTemplateForConstants (String method) FOR AbstractParameterAttribute-»
+«LET (AbstractParameterAttribute)this AS APA -»| «IF((DataType)APA.type).resourcetype != null-»«((DataType)APA.type).resourcetype.name-»«IF((DataType)APA.type).isArray-»[]«ENDIF-»«ELSE-»«((DataType)APA.type).datatype-»«IF((DataType)APA.type).isArray-»[]«ENDIF-»«ENDIF-» | «IF(APA.isMandatory((Method)Method.getStaticProperty(method.toUpperCase()).get()))»<<«APA.name»>> <(mandatory)>«ELSE»«APA.name»«ENDIF» | «((AbstractParameterAttribute)this).content.doc.description-»\ |
+|  |  | <<Constant Values>>\ |«ENDLET»
+«FOREACH ((AbstractParameterAttribute)this).content.parameterConstants AS constantValue-»
+|  |  | «constantValue.value» - <«constantValue.doc.description»>\ |
+«ENDFOREACH»*--+--+--+
+«ENDDEFINE»
+
+«DEFINE methodLink (VersionGroup currentVersionGroup, String method) FOR Resource»
+«IF currentVersionGroup.refAttributes.content.applyfor.methodusefor.toString().contains(method) || currentVersionGroup.refParameter.content.applyfor.methodusefor.toString().contains(method)-»      * {{{«method.toUpperCase()»_-_«this.name»_Resource}«method.toUpperCase()»}}«ENDIF»
+«ENDDEFINE»

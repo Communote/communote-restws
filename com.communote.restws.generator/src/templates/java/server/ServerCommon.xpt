@@ -1,0 +1,90 @@
+«IMPORT restWebservice»
+
+«EXTENSION templates::java::server::ServerExtentions»
+«EXTENSION templates::Extensions»
+
+«REM»
+	This template maps a model data type to a java data type
+«ENDREM»
+«DEFINE datatypeMapper (APIVersion currentVersion, String packagePath) FOR DataType-»
+	«IF this.resourcetype != null»
+		«getPackagePath((APIVersion)currentVersion, packagePath )».«this.resourcetype.name.toFirstUpper()»Resource
+	«ELSE-»
+		«IF this.datatype == Types.getStaticProperty("STRING").get()-»java.lang.String
+		«ELSEIF this.datatype == Types.getStaticProperty("INTEGER").get()-»java.lang.Integer
+		«ELSEIF this.datatype == Types.getStaticProperty("DATE").get()-»java.util.Date
+		«ELSEIF this.datatype == Types.getStaticProperty("LONG").get()-»java.lang.Long
+		«ELSEIF this.datatype == Types.getStaticProperty("DOUBLE").get()-»java.lang.Double
+		«ELSEIF this.datatype == Types.getStaticProperty("BYTE").get()-»java.lang.Double
+		«ELSEIF this.datatype == Types.getStaticProperty("BOOLEAN").get()-»java.lang.Boolean
+		«ELSEIF this.datatype == Types.getStaticProperty("BOOLEAN").get()-»java.lang.Boolean
+		«ENDIF-»
+	«ENDIF-»
+	«REM»if the data type is flagged as an array add the braces to the definition«ENDREM»
+	«IF this.isArray»[]«ENDIF-» 
+«ENDDEFINE»
+
+«REM»This template generate a java getter for eihter a attribute or a parameter «ENDREM»
+«DEFINE createGetter (APIVersion currentVersion, String packagePath) FOR AbstractParameterAttribute-»
+	«REM»if the attribute/parameter is a java type and not a Enum reference use the regular datatypeMapper«ENDREM»
+	«IF this.content.parameterConstants.isEmpty»
+	/**
+	 * Returns the «this.name.toFirstUpper()».
+	 * @return the «this.name.toFirstUpper()»
+	 */
+	«IF checkResourceForDummyParameterAttribute(this)»
+	@JsonIgnore
+	«ENDIF»
+	public «EXPAND datatypeMapper(currentVersion, packagePath) FOR this.type-» get«this.name.toFirstUpper()-»(){
+	«ELSEIF this.type.isArray && this.type.datatype.toString().toLowerCase() == "string"»
+	«REM»Generate getter with a string array datatype and constants«ENDREM»
+	/**
+	 * Returns List of constants «this.name.toFirstUpper()».
+	 * @return List of constants «this.name.toFirstUpper()»
+	 */
+	public java.util.List<E«this.name.toFirstUpper()»> get«this.name.toFirstUpper()-»(){
+	«ELSE»
+	«REM»Generate getter with a enum datatype«ENDREM»
+	/**
+	 * Returns the constant «this.name.toFirstUpper()».
+	 * @return the constant «this.name.toFirstUpper()»
+	 */
+	«IF checkResourceForDummyParameterAttribute(this)»
+	@JsonIgnore
+	«ENDIF»
+	public E«this.name.toFirstUpper()» get«this.name.toFirstUpper()»(){
+	«ENDIF»
+		return this.«this.name»;
+	}	
+«ENDDEFINE»
+
+«REM»This template generate a java setter for eihter a attribute or a parameter «ENDREM»
+«DEFINE createSetter (APIVersion currentVersion,String packagePath) FOR AbstractParameterAttribute-»
+	«REM»if the attribute/parameter is a java type and not a Enum reference use the regular datatypeMapper«ENDREM»
+	«IF this.content.parameterConstants.isEmpty»
+	/**
+	 * Sets «this.name.toFirstUpper()».
+	 * @param «this.name»
+	 */
+	public void set«this.name.toFirstUpper()»(«EXPAND datatypeMapper(currentVersion, packagePath) FOR this.type» «this.name»){
+	«ELSEIF this.type.isArray && this.type.datatype.toString().toLowerCase() == "string"»
+	«REM»Generate getter with a string array datatype and constants«ENDREM»
+	/**
+	 * List of constants «this.name.toFirstUpper()».
+	 * @param the constants «this.name»
+	 */
+	public void set«this.name.toFirstUpper()»( java.util.List<E«this.name.toFirstUpper()»> «this.name» ){
+	«REM»Generate setter with a enum datatype«ENDREM»
+	«ELSE-»
+	/**
+	 * Sets the constant «this.name.toFirstUpper()».
+	 * @param the constant «this.name»
+	 */
+	public void set«this.name.toFirstUpper()»(E«this.name.toFirstUpper()» «this.name»){
+	«ENDIF-»
+		this.«this.name» = «this.name»;
+	}
+«ENDDEFINE»
+
+
+

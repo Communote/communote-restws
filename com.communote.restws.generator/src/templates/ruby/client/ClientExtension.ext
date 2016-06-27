@@ -1,0 +1,65 @@
+import restWebservice;
+
+/**
+*	This method uses the api version to get the base path to the client dir
+*	@param ver - the version used for the path to determine a version depending subfolder
+**/
+private String getBasePath(APIVersion ver):
+	ver.name //please enter the full qualified path to the package where you place the REST webservice in your project 
+;
+
+/**
+*	This method is used to determine the path to the directory of the resource and parameter classes - in this case the same as the getBasePath returns
+*	@param ver - the version was used to add a version name to the package. for now it is not in use anymore
+**/
+private String getResourcePath(APIVersion ver):
+	getBasePath(ver) //this is the subpackage where the resources will be palced
+;
+
+/**
+*	This method creates a file name with the following pattern: <prefix><name_of_resource><postfix>.rb in which all characters a lower case
+*	@parma prefix - a string that is is front of the name of the resource
+*	@param postfix - a string that is add to the end of the resource name
+*	@param res - the resource for which the file is created. The resource name is used within the file name
+**/ 
+private String getFileName(String prefix, String postfix, Resource res):
+	(prefix + res.name + postfix + ".rb").toLowerCase()
+;
+
+/**
+*	This method is used to determine the path to the directory of the common client configuration files. It uses the getBasePath method and add a "client" string to the directory
+*	@param ver - the version used for the path to determine a version depending subfolder. is used to call the getBasePath method
+**/
+String getAppPath(APIVersion ver):
+	getBasePath(ver) + "/client" //this is the subpackage where the JaxRsApplication and the AppConfig will be places (with a default standalone server based on Restlet)
+;
+
+/**
+*	This method will provide the path to the ruby source file including the name of the ruby file. It uses the getResourcePath method and adds the file name to the end
+*	@param ver - the api version that is used to determine the subfolder within the getResourcePath method
+*	@param prefix - the prefix of the file name. See getFileName method
+*	@param postfix - the postfix of the file name. See getFileName method
+*	@param res - the resource that name is used for the resource file name. See getFileName method
+**/
+String getFilePath(APIVersion ver, String prefix, String postfix, Resource res):
+	getResourcePath(ver) + "/" + res.name.toLowerCase() + "_resource/" + getFileName(prefix, postfix, res)
+;
+
+/**
+*	This method determine the path to the enumeration files for the constan value classes. The file name only constists of a prefix and a postfix.
+*	@param ver - the version used for the path to determine a version depending subfolder. is used to call the getBasePath method
+*	@param prefix - the prefix of the file name. Most of the cases this value is "enum"
+*	@param postfix - the postfix of the file name. Most of the cases the name of the parameter/attribute to which the constant values belong
+*	@param res - the name of this resource is used to determine the path to the enumeration file
+**/
+String getEnumFilePath(APIVersion ver, String prefix, String postfix, Resource res):
+	getResourcePath(ver) + "/" + res.name.toLowerCase() + "_resource/" + prefix+postfix+".rb"
+;
+
+/**
+*	This method is used for providing the "require" statement to the client configuration dir. This statement is generated into the parameter classes
+*	@param ver - the version used for the path to determine a version depending subfolder. is used to call the getBasePath method
+**/
+String getRequirePath(APIVersion ver):
+	"require \"src_gen/" + getBasePath(ver) + "/client/" //this is the subpackage where the JaxRsApplication and the AppConfig will be places (with a default standalone server based on Restlet)
+;

@@ -1,0 +1,66 @@
+«IMPORT restWebservice»
+
+«EXTENSION templates::java::server::ServerExtentions»
+«EXTENSION templates::Extensions»
+
+«REM»
+	This template writes out all the configuration and helper files 
+«ENDREM»
+«DEFINE exception(APIVersion currentVersion) FOR RestWebservice-»
+«REM»
+	This section will create the illegal request parameter exception
+«ENDREM»	
+	«FILE getExceptionPath((APIVersion)currentVersion) + "/" + "RestApiIllegalRequestParameterException.java"-»
+package «getExceptionPath((APIVersion)currentVersion).replaceAll("/",".")»;
+
+/**
+ * Exception for an invalid request parameter value
+ */
+public class RestApiIllegalRequestParameterException extends Exception {
+    private static final long serialVersionUID = 1L;
+
+    private String parameter;
+    private String value;
+
+    /**
+     * Construct the exception
+     * 
+     * @param parameter
+     *            the concerned parameter
+     * @param value
+     *            the invalid value
+     * @param message
+     *            An error message
+     */
+    public RestApiIllegalRequestParameterException(String parameter, String value, String message) {
+        super(message);
+        this.parameter = parameter;
+        this.value = value;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public String getMessage() {
+        return "Invalid parameter value for " + parameter + " = '" + value + "'! "
+                + (super.getMessage() != null ? super.getMessage() : "");
+    }
+
+    /**
+     * @return the concerning parameter
+     */
+    public String getParameter() {
+        return parameter;
+    }
+
+    /**
+     * @return the invalid value causing this exception
+     */
+    public String getValue() {
+        return value;
+    }
+}
+
+	«ENDFILE»
+«ENDDEFINE»

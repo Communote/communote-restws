@@ -1,0 +1,78 @@
+import restWebservice;
+
+
+private String getBasePath(APIVersion ver):
+	((String)GLOBALVAR clientJavaPackage) //please enter the full qualified path to the package where you place the REST webservice in your project 
+;
+
+private String getResourcePath(APIVersion ver):
+	getBasePath(ver) + "/resource/" //this is the subpackage where the resources will be palced
+;
+
+//This method creates a file name with the following pattern: <prefix><name_of_resource><postfix>.java
+private String getFileName(String prefix, String postfix, Resource res):
+	(prefix + res.name + postfix + ".java")
+;
+
+String getAppPath(APIVersion ver):
+	getBasePath(ver) //this is the subpackage where the JaxRsApplication and the AppConfig will be places (with a default standalone server based on Restlet)
+;
+
+/**
+*	This method creates a path for the configuration classes <package>/common/util
+*	@param ver - is the current choosen version. Is used to get the base path
+**/
+String getUtilPath(APIVersion ver):
+	getBasePath(ver) + "/common/util"
+;
+
+
+//This method will provide the path to a java source file with the name of the file appended
+String getFilePath(APIVersion ver, String prefix, String postfix, Resource res, String filePath):
+	getResourcePath(ver) + filePath + "/" + getFileName(prefix, postfix, res)
+;
+
+String getEnumFilePath(APIVersion ver, String prefix, String postfix, String filePath):
+	getResourcePath(ver) + filePath + "/" + prefix + postfix + ".java"
+;
+
+String getRequirePath(APIVersion ver):
+	"import \"src-gen." + getBasePath(ver) + ".client." //this is the subpackage where the JaxRsApplication and the AppConfig will be places (with a default standalone server based on Restlet)
+;
+
+String getServletImportPath(APIVersion ver, Resource res):
+	(getAppPath(ver) + "/").replaceAll("/",".")
+;
+//This method will provide the java import path to a resource
+String getPackagePath(APIVersion ver, String filePath):
+	(getResourcePath(ver) + filePath).replaceAll("/",".")
+;
+
+/**
+*	This method creates a package path of an parentPath and an attribute resource type name
+*	@param parentPath - the parentPath of a resource / parameter
+*	@param attribute - attribute of type resource
+**/
+String getPackageOfResourceAttribute(String filePath, Attribute attribute):
+	(filePath.subString(0,filePath.length) + "." +attribute.type.resourcetype.name).toLowerCase()
+;
+
+/**
+*	This method creates a package path of an filePath and an parameter resource type name
+*	@param filePath - the filePath of a resource / parameter
+*	@param parameter - parameter of type resource
+**/
+String getPackageOfResourceParameter(String filePath, Parameter parameter):
+	(filePath.subString(0,filePath.length) + "." + parameter.type.resourcetype.name).toLowerCase()
+;
+
+
+/**
+*	This method creates a package path for the client
+*	@param version - the api version
+*	@param resourcePath - path of current resource beginning with /
+*	@param className - name of resource or parameter class
+**/
+String getPackagePathForClient(APIVersion version, String resourcePath, String className):
+	getPackagePath(version,resourcePath.subString(1,resourcePath.length)).toLowerCase() + "." + className
+;

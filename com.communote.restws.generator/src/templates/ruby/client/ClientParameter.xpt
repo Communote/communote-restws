@@ -1,0 +1,159 @@
+«IMPORT restWebservice»
+
+«EXTENSION templates::ruby::client::ClientExtension»
+«EXTENSION templates::Extensions»
+
+«REM»
+This template block calls another template block to generate the different parameter classes
+Generation steps:
+	- calls the template for the generation of the diffenent parameter classes diffent times with different parameters
+	@param version - current API version object is needed for the version check and the file path
+	@param path - is the path adress of the current processing it is used for determine the address path as return value
+«ENDREM»
+«DEFINE parametertemplate(APIVersion version, String path, Boolean fullRestSupport) FOR Resource»
+	«REM»This are special parameter classes for a resource to be created«ENDREM»
+	«IF hasMethod(this.resourceId.first(), (Method)Method.getStaticProperty("GET").get())» 
+		«EXPAND parameterclasses(version, "Get", 			(Method)Method.getStaticProperty("GET").get(), 			path+"/#{@"+this.resourceId.first().name.toLowerCase() +"}", fullRestSupport) FOR this»
+	«ENDIF»
+	«IF hasMethod(this.resourceId.first(), (Method)Method.getStaticProperty("PUT").get())» 
+		«EXPAND parameterclasses(version, "Edit", 			(Method)Method.getStaticProperty("PUT").get(), 			path+"/#{@"+this.resourceId.first().name.toLowerCase() +"}", fullRestSupport) FOR this»
+	«ENDIF»
+	«IF hasMethod(this.resourceId.first(), (Method)Method.getStaticProperty("DELETE").get())» 
+		«EXPAND parameterclasses(version, "Delete", 		(Method)Method.getStaticProperty("DELETE").get(), 		path+"/#{@"+this.resourceId.first().name.toLowerCase() +"}", fullRestSupport) FOR this»
+	«ENDIF»
+	«IF  isCreationAvailable(version, this, (Method)Method.getStaticProperty("POST").get())»
+		«EXPAND parameterclasses(version, "Create", 		(Method)Method.getStaticProperty("POST").get(), 		path, fullRestSupport) FOR this»
+	«ENDIF»
+	«IF  isCreationAvailable(version, this, (Method)Method.getStaticProperty("GET_COLLECTION").get())»
+		«EXPAND parameterclasses(version, "GetCollection", 	(Method)Method.getStaticProperty("GET_COLLECTION").get(), path, fullRestSupport) FOR this»
+	«ENDIF»
+«ENDDEFINE»
+
+«REM»
+This template block is used to generate the different parameter classes for a resource
+Generation steps:
+	- writing the class attributes consisting of the attributes and parameters that are label for the corresponding HTTP method (at the beginning use the resource ids of the resource and the parent resources afterwards take the other parameters(attributes)
+	- define the get_uri_path method (that is called while using this method)
+	- define the get_parameter_string method (provides a string containing all set parameter with value and key)
+	- define the is_valid_parameter_list method (checks if all the mandatory parameter are set)
+	@param version - current API version object is needed for the version check and the file path
+	@param fileprefix - is a string that is put in front of the resource name which makes out the file and class name. Will be used for indication for what HTTP method the class is supposed to
+	@param method - is the HTTP method for which the generation will be done
+	@param path - 
+«ENDREM»
+«DEFINE parameterclasses(APIVersion version, String fileprefix, Method method, String path, Boolean fullRestSupport) FOR Resource»
+	«FILE getFilePath(version, fileprefix+"_", "_parameter", this)-»
+«getRequirePath(version)»method_parameter.rb"
+«getRequirePath(version)»util.rb"
+
+class «fileprefix + this.name»Parameter < MethodParameter
+		«REM»Iterate over all the resource ids and add them as class members«ENDREM»
+		«FOREACH this.resourceId  AS resourceid-»
+			«REM»if the resource id is the id of the current resource and has the current chosen method than the resource id is needed for the addressing (e.g. standard single resource calls)
+			 OR it is the resource id of a parent resource«ENDREM»
+		  	«IF(resourceid == this.resourceId.first() && hasMethod(resourceid, method) ||  resourceid != this.resourceId.first())-»
+  attr_accessor :«resourceid.name.toLowerCase()»; #«resourceid.content.doc.description»
+			«ENDIF»
+	  	«ENDFOREACH-»
+		«REM»write the current version group to a variable«ENDREM»
+		«LET getVersionGroupByVersion(this.versionGroups, version) AS versionGroup-»
+			«REM»iterate over all attributes and write them as class members excepted the resource id attribute«ENDREM»
+	  		«FOREACH ((VersionGroup)versionGroup).refAttributes  AS attr-»
+	  			«IF hasMethod(attr, method) && attr != this.resourceId.first()»
+  attr_accessor :«attr.name.toLowerCase()»;#«attr.content.doc.description-»
+				«ENDIF-»
+	  		«ENDFOREACH-»
+	  		
+	  		«REM»iterate over all parameters and write them as class members«ENDREM»
+			«FOREACH ((VersionGroup)versionGroup).refParameter  AS param-»
+				«IF hasMethod(param,method )-»
+  attr_accessor :«param.name.toLowerCase()»;#«param.content.doc.description»
+				«ENDIF-»
+			«ENDFOREACH-»
+  «REM»Write out the method that provides the uri path to address the resource«ENDREM»	
+  #This method provides a path to address the uri. this path has to be added to the end of the base uri  
+  def get_uri_path()
+  	unless is_valid_parameter_list; return raise ArgumentError.new "Not all mandatory attribues are set";end
+  	«REM»The method tunneling through POST can be used for the DELETE and PUT methods only. 
+  	So if the parameter class is for one of these methods an the tunneling is activated, the "?_method=" string is attached to the URI.
+	The path variable comes from the calling method
+  	«ENDREM»
+  	«IF (method == ((Method)Method.getStaticProperty("DELETE").get()) || method == ((Method)Method.getStaticProperty("PUT").get()) && !fullRestSupport)-» 
+    return "/«path»?_method=«method.toString().toUpperCase()»"
+    «ELSE-»
+    return "/«path»"
+    «ENDIF-»
+  end
+  «REM»Write out the method that provides a parameter string that can be send within the network request. This sting is from "application/x-www-form-urlencoded" mime-type
+  within this mehod the call of the validation method is written
+  «ENDREM»	  
+  #This method provides a string containing all request parameters with their values. If no value is the the parameter is skipped
+  #If a mandatory parameter is not set, an ArgumentError will be raised 
+  #For a GET/List request this return value has to be added to the end of the address path, for all other request it has to be set to the http body
+  def get_parameter_string()
+  	«REM»call the validation method. if a mandatory field is not set raise an Error/Exception«ENDREM»
+    unless is_valid_parameter_list; return raise ArgumentError.new "Not all mandatory attribues are set";end
+    «REM»if the parameter list is for a GET request a question mark is written to the first position of the string«ENDREM»
+    «IF (method == ((Method)Method.getStaticProperty("GET").get()) || method == ((Method)Method.getStaticProperty("GET_COLLECTION").get()) )-»
+    paramlist = "?"
+    «ELSE-»
+    paramlist = ""
+    «ENDIF-»
+    		«REM»if the resource id of this resource has the POST or GET COLLECTION method assigned than add the resource id value to the parameter list string«ENDREM»
+    		«IF (method == ((Method)Method.getStaticProperty("POST").get()) || method == ((Method)Method.getStaticProperty("GET_COLLECTION").get()) ) && hasMethod(this.resourceId.first(), method)-»
+    	if @«this.resourceId.first().name.toLowerCase()»;  paramlist << "«this.resourceId.first().name»=#{@«this.resourceId.first().name.toLowerCase()»}&"; end
+    		«ENDIF-»
+    		«REM»add all the attributes defined for the version group to the paramater request string if a value is set«ENDREM»
+    		«FOREACH ((VersionGroup)versionGroup).refAttributes  AS attr-»
+    			«REM»Take all the attributes for this http method excepted the current resource id«ENDREM»
+	  			«IF hasMethod(attr, method) && attr != this.resourceId.first() -»
+	  				«REM»if the attribute is a array call the util method for transformation to a parameter list string«ENDREM»
+	  				«IF attr.type.isArray-»
+	if @«attr.name.toLowerCase()»;  paramlist << "#{Util.to_param_list(@«attr.name.toLowerCase()»,"«attr.name»")}&"; end		
+					«ELSE-»
+  	if @«attr.name.toLowerCase()»;  paramlist << "«attr.name»=#{@«attr.name.toLowerCase()»}&"; end
+	  				«ENDIF-»
+				«ENDIF-»
+	  		«ENDFOREACH-»
+	  		«REM»Take all the parameter for this http method«ENDREM»
+			«FOREACH ((VersionGroup)versionGroup).refParameter  AS param-»
+				«IF hasMethod(param,method )-»
+					«IF param.type.isArray-»
+					«REM»if the parameter is a array call the util method for transformation to a parameter list string«ENDREM»
+	if @«param.name.toLowerCase()»;  paramlist << "#{Util.to_param_list(@«param.name.toLowerCase()»,"«param.name»")}&"; end
+  					«ELSE-»
+  	if @«param.name.toLowerCase()»;  paramlist << "«param.name»=#{@«param.name.toLowerCase()»}&"; end
+  					«ENDIF-»
+				«ENDIF-»
+			«ENDFOREACH-»
+    return paramlist[0..paramlist.size-2] «REM»Return statement for the parameter string without the last & sign«ENDREM»
+  end
+  
+  «REM»Write out the method that provides the uri path to address the resource«ENDREM»	  
+  #This method validates the mandatory attributes. It returns true if all the attributes are properly set otherwise false
+  def is_valid_parameter_list()
+    is_valid = true
+     #checks for the needed resource ids to be set
+	    	«FOREACH this.resourceId  AS resourceid-»
+	    		«IF(resourceid == this.resourceId.first() && hasMethod(resourceid, method) ||  resourceid != this.resourceId.first())-»
+ 	 if @«resourceid.name.toLowerCase()» == nil; is_valid = false; end
+				«ENDIF-» 		
+		  	«ENDFOREACH-»
+    #checks for all mandatory attributes
+    		«FOREACH ((VersionGroup)versionGroup).refAttributes  AS attr-»
+	  			«IF hasMethod(attr, method) && isMandatory(attr, method) && attr != this.resourceId.first() -»
+  	if @«attr.name.toLowerCase()» == nil; is_valid = false; end
+				«ENDIF-»
+	  		«ENDFOREACH-»
+	#checks for all mandatory parameters
+			«FOREACH ((VersionGroup)versionGroup).refParameter  AS param-»
+				«IF hasMethod(param,method ) && isMandatory(param, method)-»
+  	if @«param.name.toLowerCase()» == nil; is_valid = false; end
+				«ENDIF-»
+			«ENDFOREACH-»
+    return is_valid
+  end
+end
+	  «ENDLET-»  
+	«ENDFILE»
+«ENDDEFINE»

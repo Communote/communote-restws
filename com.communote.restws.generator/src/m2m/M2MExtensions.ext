@@ -1,0 +1,191 @@
+/**
+*	This file privides general functonality for a model-2-model transformation. 
+*	@author Matthias Guenther
+* 	@date 2010/2011
+**/
+import restWebservice;
+
+
+extension templates::Extensions;
+
+/**
+*	This part just iterates over the list of web services provided by the workflow and calls another method that processes a single webservice
+*	@param list of web serives
+*	@return list of web services
+**/
+RestWebservice main(List[RestWebservice] webserviceList):
+	webserviceList.collect(ws| ws.transformWebservice()  ) ->
+	webserviceList
+;
+
+/**
+*	This part processes a single webservice, iterates over the parameter groups, and interates over the resources
+*	Transformation Steps:
+*		- first letter of the name of the web service to upper case 
+*	@param web serives
+*	@return web services
+**/
+transformWebservice(RestWebservice webservice):
+	webservice.name.toLowerCase().toFirstUpper() ->
+	webservice.parameterGroups.collect(e|e.parameterGroupValues.collect(e|e.transformParameter())) -> //parameter groups that can be linked with any resource
+	webservice.resources.collect(res| res.transformResource(webservice))
+;
+
+/**
+*	This part processes a single resource, does a renaming, iterates over the attributes and parameter lists to process each instance, calls the manipulation for the resource id
+*	Transformation Steps:
+*		- first letter of resources is a capital letter
+*		- combines the choosen parameter groups with the resource parameter
+*		- sorts the attributes ascending
+*		- sorts the parameter ascending
+*	@param web serives - is needed to evaluate the parameter groups and combine them with the resource parameter
+*	@param resource - the resource to manipulate
+*	@return resource
+**/
+transformResource(Resource resource, RestWebservice webservice):
+	resource.setName(resource.name.toFirstUpper()) -> //rename the resources to start with a capital letter
+	resource.attributes.collect(attr|	//iterate over all attributes
+		attr == (resource.resourceId.first()) ?	//if the attribute is the resource id instance...
+			attr.transformResourceID()  //...transform the resource id
+		:   attr.transformAttribute()   //...otherwise transform the regular attribut   
+	)->
+	resource.parameters.collect(param| //iterates over all parameter
+		param.transformParameter() //transform parameter 
+	)->
+	resource.changeRefParameter(webservice) -> //combine parameter groups and resource parameter
+	resource.attributes.sortByNameAscending() ->  //sort the attributes by name ascending
+	resource.parameters.sortByNameAscending() ->  //sort the parameters by name ascending
+	resource.subResources.collect(e|
+		e.resourceId.addAll(resource.resourceId) -> //add the previous resource ids to the list. These are used as attributes within the subresources
+		e.transformResource(webservice))-> //transform all subresources (recursiv)
+	resource
+;
+
+/**
+*	This part takes  a version group of a resource and combines the direct refered parameters with parameter of the refered parameter group.
+*	Finally the manipulated version group replaces the current existing version group
+*	@param resource - the resource of which the parameters will be combined
+*	@param webservice - is needed for retrieving a API version instance depending on the choosen api version
+*	@return resource 
+**/
+Resource changeRefParameter(Resource resource, RestWebservice webservice):
+	getVersionGroupByVersion( //get a version group reference of a resource to manipulate depending on the selected version
+			resource.versionGroups, getApiVersionFormString( 
+				webservice, ((String) GLOBALVAR selectedAPIVersion)
+			)
+		).combineParameters()-> //combine the web service parameter and the resource parameter within the selected version group
+		resource
+;
+
+/**
+*	This part takes  all the refered parameter groups from the version group and adds all the parameters from this group to the direct refered parameters list
+*	@param version group - the version group that contains the references to the parameter and the parameter groups
+*	@return version group 
+**/
+VersionGroup combineParameters(VersionGroup versiongroup):
+ 	versiongroup.refParameterGroups.collect(e|
+	 	versiongroup.refParameter.createRefParameterList(e.parameterGroupValues)
+ 	)
+;
+
+/**
+*	This part takes all the refered parameter groups from a version group and the direct refered parameters and
+*	 creates a new list with both of them
+*	@param refParameters - the direct refered parameter list where the group parameters will be added
+*	@groupParameters - the parameter of the group
+*	@return version group 
+**/
+create List[Parameter] this createRefParameterList(List[Parameter] refParameters, List[Parameter] groupParameters):
+	refParameters.addAll(groupParameters)
+;
+
+/**
+*	This part checks if all needed HTTP methods for a resource id instance are set. If there is one missing it will be added while adding a  new "madatoryfor" feature to the applyfor list
+*	TODO the methodes should be always mandatory currently they arn't in the case the modeller doesn't set them mandatory within the model definition
+*	Transformation Steps:
+*		- add the default "mandatoryfor" value of the resource if
+*	@param attribute - which is supposed to be the resource id
+*	@return attribute
+**/
+transformResourceID(Attribute attribute): 
+	let uses = attribute.content.applyfor.collect(e|e.methodusefor.toString()):
+		uses.isEmpty ? 
+			(attribute.content.applyfor.addHttpMethodMandatory("GET") ->
+			attribute.content.applyfor.addHttpMethodMandatory("PUT") ->
+			attribute.content.applyfor.addHttpMethodMandatory("DELETE") ->
+			attribute)
+		: attribute 
+;
+
+/**
+*	This part checks if any HTTP methods for the attribute is set. If there is no one set that a usefor feature for the http PUT and POST method is added
+*	Transformation Steps:
+*		- add the default "applyfor" value of a attribute
+*	@param attribute - which should have at least the put and post http methods
+*	@return attribute
+**/
+transformAttribute(Attribute attribute):
+	let uses = attribute.content.applyfor.collect(e|e.methodusefor.toString()): // the 
+		uses.isEmpty ?
+			(!uses.contains("put") ? attribute.content.applyfor.addHttpMethod("PUT") : attribute ->
+			 !uses.contains("post") ? attribute.content.applyfor.addHttpMethod("POST") : attribute )
+		: attribute
+;
+
+/**
+*	This part checks if HTTP methods in "usefor" are set if this is not the case it will add a "LIST" entry.
+*	Therefor it calls the addHttpMethod(...) and replaces the "applyfor" list of the parameter with the 
+*	returned "applyfor" list of the method. Finally the modified parameter is returned.
+*	Transformation Steps:
+*		- add the default "applyfor" value of a parameter (list) if no one is set already
+*	@param parameter
+*	@return parameter
+**/
+transformParameter(Parameter parameter):
+	let uses = parameter.content.applyfor.collect(e|e.methodusefor.toString()): //iterate over all the assigned methodes of the applyfor feature
+		uses.isEmpty ? //if this list is empty...
+			parameter.content.applyfor.addHttpMethod("GET_COLLECTION")//...assign a applyfor list with the list parameter in it and hand this modified parameter instance back
+		:parameter  //...otherwiese just hand back the old parameter
+;
+
+/**
+*	This part sorts a attribute or parameter list by name ascending
+*	@param abstractPA - list with attributes or parameter to be sorted
+*	@return list with attributes or parameter
+**/
+sortByNameAscending(List[AbstractParameterAttribute] abstractPA):
+	abstractPA.sortBy(e|e.name.toFirstLower())
+;
+
+/**
+*	This part creates a new "usefor" feature and adds this feature to the given "applyfor" list. 
+*	The "applyfor" list is returned to replace the old one.
+*	Transformation Steps:
+*		- creates a "usefor" feature specified by the method string  and adds it to a given "applyfor" list 
+*	@param list of type applyfor - the list to that the new created usefor feature will be added (call by reference) 
+*	@param method - is a string that indicates which HTTP method should be contained within the usefor feature (GET, PUT, POST, DELETE, GET_COLLECTION)
+*	@return list of type applyfor
+**/
+List[ApplyFor] addHttpMethod(List[ApplyFor] applyfor, String method):
+	let useFor = new UseFor:
+		useFor.setMethodusefor(((Method)Method.getStaticProperty(method).get()))->
+		applyfor.add(useFor ) ->
+		applyfor
+;
+
+/**
+*	This part creates a new "mandatoryfor" feature and adds this feature to the given "applyfor" list. 
+*	The "applyfor" list is returned to replace the old one. The "isMandatory" feature is set to "true"
+*	Transformation Steps:
+*		- creates a "mandatoryfor" feature specified by the method string, set the isMandatory feature to true and adds it to a given "applyfor" list 
+*	@param list of type applyfor - the list to that the new created mandatoryfor feature will be added (call by reference) 
+*	@param method - is a string that indicates which HTTP method should be contained within the mandatoryfor feature (GET, PUT, POST, DELETE, GET_COLLECTION)
+*	@return list of type applyfor
+**/
+List[ApplyFor] addHttpMethodMandatory(List[ApplyFor] applyfor, String method):
+	let mandatoryFor = new MandatoryFor:
+		mandatoryFor.setMethodusefor(((Method)Method.getStaticProperty(method).get()))->
+		mandatoryFor.setMandatory(true) ->
+		applyfor.add(mandatoryFor) ->
+		applyfor
+;

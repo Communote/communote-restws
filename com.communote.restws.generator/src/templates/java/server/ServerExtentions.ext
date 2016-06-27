@@ -1,0 +1,97 @@
+import restWebservice;
+
+/**
+*	This method uses the global variable of the servlet package defined in the workflow file 
+*	@param ver - the version was used to add a version name to the package. for now it is not in use anymore
+**/
+private String getBasePath(APIVersion ver):
+	((String)GLOBALVAR serverPackage)// +"/"+ ver.name //please enter the full qualified path to the package where you place the REST webservice in your project 
+;
+
+/**
+*	This method creates a file name with the following pattern: <prefix><name_of_resource><postfix>.java
+*	@param prefix - a literal that will be placed in front of the filename
+*	@param postfix - a literal that will be placed at the end of the filename
+*	@param res - is the resource of which the file have to be created. Is needed for the file name
+**/
+private String getFileName(String prefix, String postfix, Resource res):
+	(prefix + res.name + postfix + ".java").toFirstUpper()
+;
+
+/**
+*	This method creates a path for the configuration classes <package>/servlet
+*	@param ver - is the current choosen version. Is used to get the base path
+**/
+String getAppPath(APIVersion ver):
+	getBasePath(ver) + "/servlet" //this is the subpackage where the JaxRsApplication and the AppConfig will be places (with a default standalone server based on Restlet)
+;
+
+/**
+*	This method provides you the file path with file name for an enum file. It uses the parameter/attribute name a file name and add a E in front of it
+*	@param ver - is the current choosen version
+*	@param res - is the resource that holdes the parameter/attribute. The name of the resource is needed to determine the path
+*	@param param - is the parameter that has the constant values
+**/
+String getEnumFilePath(APIVersion ver, Resource res, AbstractParameterAttribute param, String filePath):
+	getResourcePath(ver) + filePath + "/E" + param.name.toFirstUpper()+".java"
+;
+
+/**
+*	This method creates a path for the configuration classes <package>/exception
+*	@param ver - is the current choosen version. Is used to get the base path
+**/
+String getExceptionPath(APIVersion ver):
+	getBasePath(ver) + "/exception" //this is the subpackage where the JaxRsApplication and the AppConfig will be places (with a default standalone server based on Restlet)
+;
+
+
+/**
+*	This method creates a path for a resource or parameter file with a prefix and a postfix
+*	@param ver - is the current choosen version
+*	@param res - is the resource where the import path will be included The name of the resource is needed to determine the path
+**/
+String getFilePath(APIVersion ver, String prefix, String postfix, Resource res, String filePath):
+	getResourcePath(ver) + filePath + "/" + getFileName(prefix, postfix, res)
+;
+/**
+*	This method creates a path for a java import statement to a resource
+*	@param ver - is the current choosen version
+*	@param res - is the resource where the import path will be included The name of the resource is needed to determine the path
+**/
+String getPackagePath(APIVersion ver, String filePath):
+	(getResourcePath(ver) + filePath ).replaceAll("/",".")
+;
+
+/**
+*	This method creates a path for the resource/paramter classes <package>/resource
+*	@param ver - is the current choosen version. Is used to get the base path
+**/
+String getResourcePath(APIVersion ver):
+	getBasePath(ver) + "/resource/" //this is the subpackage where the resources will be palced
+;
+
+/**
+*	This method creates a path for a java import statement to the servlet directory
+*	@param ver - is the current choosen version
+**/
+String getServletImportPath(APIVersion ver):
+	(getAppPath(ver) + "/").replaceAll("/",".")
+;
+
+/**
+*	This method creates a package path of an filePath and an attribute resource type name
+*	@param filePath - the filePath of a resource / parameter
+*	@param attribute - attribute of type resource
+**/
+String getPackageOfResourceAttribute(String filePath, Attribute attribute):
+	(filePath.subString(0,filePath.length) + "." +attribute.type.resourcetype.name).toLowerCase()
+;
+
+/**
+*	This method creates a package path of an filePath and an parameter resource type name
+*	@param filePath - the filePath of a resource / parameter
+*	@param parameter - parameter of type resource
+**/
+String getPackageOfResourceParameter(String filePath, Parameter parameter):
+	(filePath.subString(0,filePath.length) + "." + parameter.type.resourcetype.name).toLowerCase()
+;
